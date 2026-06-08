@@ -1003,8 +1003,8 @@ async function autoGenRoutine(){
     const prompt=`You are a wellness coach. Given this user profile, return ONLY a JSON object (no markdown) with two keys:
 "trainRoutine": array of 8-10 objects {t,a,n} — a realistic daily schedule for a TRAINING DAY. t=time/label (e.g. "Wake Up","Morning","Pre-Workout","Post-Workout","Lunch","Afternoon","Dinner","2 hrs before bed","Before Bed"), a=specific action tailored to their goal and diet, n=optional short coaching note (can be empty string). REQUIRED anchors — you MUST include all four: (1) first entry: Wake Up — drink water immediately before anything else; (2) second entry: Morning — 5-10 min of outdoor sunlight within first hour of waking; (3) near end: "2 hrs before bed" — stop eating, last meal; (4) final entry: "Before Bed" — no screens or use blue light glasses. Build the rest around training and their goals.
 "restRoutine": array of 7-9 objects {t,a,n} — same format but for a REST DAY. Same four required anchors. Lighter meals, recovery focus, no pre/post workout entries.
-Profile: name=${p.name||'User'}, goal=${goal}, diet=${p.diet||'no restrictions'}, weight=${p.weight||'unknown'}lbs, sleep=${p.sleep||'fair'}, injuries=${p.injuries||'none'}
-Make the routines specific and personal. No emoji in t or a fields.`;
+Profile: name=${p.name||'User'}, goal=${goal}, bodyType=${p.bodyType||'mesomorph'}, diet=${p.diet||'no restrictions'}, weight=${p.weight||'unknown'}lbs, sex=${p.sex||'unknown'}, sleep=${p.sleep||'fair'}, injuries=${p.injuries||'none'}
+Make the routines specific and personal — reference their body type in meal timing and food choices (ectomorphs need more caloric density and carbs; endomorphs benefit from protein-first, lower-carb meals; mesomorphs get a balanced approach). No emoji in t or a fields.`;
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:1500}})
@@ -6398,6 +6398,8 @@ const WIZ_STEPS=[
   {type:'welcome'},
   // 1: Basic stats
   {type:'stats'},
+  // 1b: Body type
+  {type:'bodytype'},
   // 2: Goal
   {type:'opts',key:'goal',title:'What is your primary goal?',sub:'This shapes your entire training and nutrition plan.',icon:'🎯',
    opts:[
@@ -6551,6 +6553,37 @@ function renderWizStep(s){
         </div>
       </div>`;
   }
+  if(s.type==='bodytype'){
+    const sel=_wiz.profile.bodyType||null;
+    const types=[
+      {val:'ectomorph',em:'🔥',label:'Ectomorph',sub:'Lean & lanky, fast metabolism, hard to gain weight',
+       desc:'Your body burns through calories quickly. You need higher carbs and more total food to build muscle.',
+       traits:'Fast metabolism · Hard gainer · Responds well to higher carbs'},
+      {val:'mesomorph',em:'💪',label:'Mesomorph',sub:'Athletic build, gains muscle and loses fat easily',
+       desc:'You respond well to most training styles. Balanced macros work best — moderate protein, carbs, and fat.',
+       traits:'Athletic frame · Gains & loses easily · Balanced macros'},
+      {val:'endomorph',em:'🛡️',label:'Endomorph',sub:'Naturally broader, stores fat easily, slower metabolism',
+       desc:'Your body is carb-sensitive. Lower carb, higher protein, and strategic nutrition will get you the best results.',
+       traits:'Slower metabolism · Carb-sensitive · Builds strength easily'},
+    ];
+    return `<div class="wiz-title">What is your body type?</div>
+      <div class="wiz-sub">This shapes your macro split, calorie targets, and how your plan is built.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${types.map(t=>`
+          <div onclick="wizSel('bodyType','${t.val}')" style="padding:14px 16px;background:var(--surface2);border:1.5px solid ${sel===t.val?'var(--green)':'var(--border)'};border-radius:14px;cursor:pointer;transition:border-color .15s${sel===t.val?';background:rgba(171,108,82,.08)':''}">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
+              <span style="font-size:22px">${t.em}</span>
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--text)">${t.label}</div>
+                <div style="font-size:12px;color:var(--sub);margin-top:1px">${t.sub}</div>
+              </div>
+              ${sel===t.val?`<div style="margin-left:auto;width:20px;height:20px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>`:''}
+            </div>
+            <div style="font-size:12px;color:var(--sub);line-height:1.45;padding-left:32px">${t.desc}</div>
+            <div style="font-size:11px;color:${sel===t.val?'var(--green)':'var(--sub)'};font-weight:600;margin-top:5px;padding-left:32px;opacity:.75">${t.traits}</div>
+          </div>`).join('')}
+      </div>`;
+  }
   if(s.type==='opts'){
     const sel=_wiz.profile[s.key]||null;
     return `<div class="wiz-title">${s.title}</div>
@@ -6666,6 +6699,8 @@ function wizUpdateNext(){
     const wt=document.getElementById('wi-weight')?.value;
     const sex=document.getElementById('wi-sex')?.value;
     ok=!!(age&&wt&&sex);
+  }else if(s.type==='bodytype'){
+    ok=!!_wiz.profile.bodyType;
   }else if(s.type==='opts'){
     ok=!!_wiz.profile[s.key];
   }else if(s.type==='tiles'){
@@ -7199,15 +7234,27 @@ function buildWorkoutFromLibrary(p){
 }
 
 function wizComputeTargets(p){
-  const wt=p.weight||170;const goal=p.goal||'muscle';
+  const wt=p.weight||170;
+  const goal=p.goal||'muscle';
+  const body=p.bodyType||'mesomorph';
+  // Base calorie multiplier by goal
   const mult={muscle:16,fat_loss:13,strength:17,fitness:15,maintenance:14};
-  const k=Math.round(wt*(mult[goal]||15));
-  const prot=Math.round(wt*(goal==='fat_loss'?1.1:1.0));
-  const fat=Math.round(k*0.28/9);
-  const carb=Math.round((k-prot*4-fat*9)/4);
+  let k=Math.round(wt*(mult[goal]||15));
+  // Body type calorie adjustment
+  if(body==='ectomorph') k=Math.round(k*1.10); // fast metabolism — needs more
+  if(body==='endomorph') k=Math.round(k*0.92); // slower metabolism — slightly less
+  // Protein: endomorphs benefit from more protein (keeps carbs in check)
+  const protMult=body==='endomorph'?(goal==='fat_loss'?1.25:1.15):
+                 body==='ectomorph'?(goal==='fat_loss'?1.0:0.95):
+                 (goal==='fat_loss'?1.1:1.0);
+  const prot=Math.round(wt*protMult);
+  // Fat %: endomorphs go higher fat/lower carb; ectomorphs go higher carb/lower fat
+  const fatPct=body==='endomorph'?0.33:body==='ectomorph'?0.22:0.28;
+  const fat=Math.round(k*fatPct/9);
+  const carb=Math.max(20,Math.round((k-prot*4-fat*9)/4));
   return{
     train:{p:prot,c:carb,f:fat,k:k,w:Math.round(wt*0.67)},
-    rest:{p:Math.round(prot*.9),c:Math.round(carb*.75),f:fat,k:Math.round(k*.85),w:Math.round(wt*0.55)}
+    rest:{p:Math.round(prot*.9),c:Math.round(carb*(body==='endomorph'?0.65:0.75)),f:fat,k:Math.round(k*.85),w:Math.round(wt*0.55)}
   };
 }
 
@@ -7357,8 +7404,8 @@ Rules:
 "recoverySchedule": array of 5 objects {t,a,n} (t=time label, a=action, n=short note)
 "trainRoutine": array of 8-10 objects {t,a,n} — a realistic daily schedule for a TRAINING DAY. t=time/label (e.g. "Wake Up","Morning","Pre-Workout","Post-Workout","Lunch","Afternoon","Dinner","2 hrs before bed","Before Bed"), a=specific action tailored to their goal and diet, n=optional short coaching note (can be empty string). REQUIRED anchors — you MUST include all four: (1) first entry: Wake Up — drink water immediately before anything else; (2) second entry: Morning — 5-10 min of outdoor sunlight within first hour of waking; (3) near end: "2 hrs before bed" — stop eating, last meal; (4) final entry: "Before Bed" — no screens or use blue light glasses. Build the rest around training and their goals.
 "restRoutine": array of 7-9 objects {t,a,n} — same format but for a REST DAY. Same four required anchors. Lighter meals, recovery focus, no pre/post workout entries.
-Profile: name=${p.name||'User'}, goal=${p.goal}, diet=${p.diet}, allergens=${(p.allergens||[]).join(',')}, restrictions=${p.allergenNotes||'none'}, injuries=${p.injuries||'none'}, weight=${p.weight}lbs, sleep=${p.sleep||'fair'}
-Make the routines specific and personal — reference their goal, diet preferences, and weight. Avoid generic filler. No emoji in t or a fields.`;
+Profile: name=${p.name||'User'}, goal=${p.goal}, bodyType=${p.bodyType||'mesomorph'}, diet=${p.diet}, allergens=${(p.allergens||[]).join(',')}, restrictions=${p.allergenNotes||'none'}, injuries=${p.injuries||'none'}, weight=${p.weight}lbs, sex=${p.sex||'unknown'}, sleep=${p.sleep||'fair'}
+Make the routines specific and personal — reference their goal, body type, diet preferences, and weight. For ectomorphs emphasize caloric density and carb timing; for endomorphs emphasize protein-first meals and limiting simple carbs; for mesomorphs use a balanced approach. Avoid generic filler. No emoji in t or a fields.`;
       const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:2000}})
@@ -7382,18 +7429,8 @@ Make the routines specific and personal — reference their goal, diet preferenc
 }
 
 function wizFallbackPlan(p){
-  const wt=p.weight||170;
-  const goal=p.goal||'muscle';
-  const multiplier=goal==='fat_loss'?13:goal==='muscle'?16:14;
-  const k=Math.round(wt*multiplier);
-  const prot=Math.round(wt*(goal==='fat_loss'?1.1:1.0));
-  const fat=Math.round(k*0.28/9);
-  const carb=Math.round((k-prot*4-fat*9)/4);
   return{
-    targets:{
-      train:{p:prot,c:carb,f:fat,k:k,w:Math.round(wt*0.67)},
-      rest:{p:Math.round(prot*.9),c:Math.round(carb*.75),f:fat,k:Math.round(k*.85),w:Math.round(wt*0.55)}
-    },
+    targets:wizComputeTargets(p),
     workouts:{},
     foodSuggestions:[
       {n:'Grilled Chicken Breast',e:'🍗',cat:'lunch',p:31,c:0,f:4,k:165},
