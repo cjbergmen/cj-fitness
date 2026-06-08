@@ -3131,7 +3131,6 @@ const NS_PROFILES = {
     hydration:'Minimum 80–100 oz water daily. Electrolytes if sweating significantly. Limit alcohol as a primary de-stress tool.',
     recovery:'Same wake time daily (non-negotiable). Daily passive rest (floor time 5–10 min). Weekly slow nature walk. Monthly bodywork (massage, craniosacral). Unstructured time each week — no optimization.',
     supplements:['Magnesium glycinate 200–400mg before bed','Omega-3 (EPA/DHA 2–3g) daily','Ashwagandha KSM-66 (optional — monitor for paradoxical activation)'],
-    fullscript:'https://us.fullscript.com/welcome/metastoryhealth'
   },
   'Trauma-Driven Anxiety': {
     badge:'Profile 2', color:'#7a9aab',
@@ -3146,7 +3145,6 @@ const NS_PROFILES = {
     recovery:'Consistent sleep/wake times as anchors of predictability. Yoga nidra or body scan before sleep. Co-regulation with safe, calm people weekly. Trauma-informed somatic therapy strongly recommended if significant history.',
     clinicalNote:'If you have a significant trauma history or C-PTSD symptoms, working alongside a trauma-informed somatic therapist, EMDR practitioner, or SE-trained clinician is strongly recommended.',
     supplements:['Magnesium glycinate 200–400mg','Omega-3 (EPA/DHA 2–3g)','L-theanine 200mg as needed','Zinc 15–30mg'],
-    fullscript:'https://us.fullscript.com/welcome/metastoryhealth'
   },
   'Biological Anxiety': {
     badge:'Profile 3', color:'#ab6c52',
@@ -3161,7 +3159,6 @@ const NS_PROFILES = {
     recovery:'Sleep architecture is clinical priority: consistent wake time, screens off 90 min prior, cool/dark room, no alcohol 3 hrs before bed. Coherent breathing 10–20 min daily. HRV tracking weekly.',
     clinicalNote:'Medical evaluation recommended: thyroid panel, inflammatory markers (CRP), ferritin, vitamin D, B12. Consider genetic variants (COMT, SLC6A4, MTHFR) with persistent symptoms.',
     supplements:['Magnesium glycinate 200–400mg','L-theanine 200mg','Ashwagandha KSM-66 300–600mg','Vitamin D 2000–5000 IU (if deficient)','Omega-3 (EPA/DHA 2–3g)'],
-    fullscript:'https://us.fullscript.com/welcome/metastoryhealth'
   },
   'Burnout & Collapse': {
     badge:'Profile 4', color:'#7a9aab',
@@ -3176,7 +3173,6 @@ const NS_PROFILES = {
     recovery:'Passive rest 15 min daily (mandatory). Consistent sleep/wake times. Demand audit weekly — remove, delay, or delegate non-essential obligations. Social warmth with calm, safe people.',
     clinicalNote:'Stage 3 burnout (inability to work or care for self) requires professional support. This protocol is for Stage 1–2. Consult a functional medicine or integrative health practitioner if symptoms are severe.',
     supplements:['Magnesium glycinate 300–400mg','Omega-3 (EPA/DHA 2–3g)','Ashwagandha KSM-66 300mg AM (not PM)','B-complex (methylated forms)','Vitamin D 2000–5000 IU'],
-    fullscript:'https://us.fullscript.com/welcome/metastoryhealth'
   },
   'Mild Situational Anxiety': {
     badge:'Profile 5', color:'#b7baa7',
@@ -3190,7 +3186,6 @@ const NS_PROFILES = {
     hydration:'80+ oz daily. Limit alcohol — disrupts sleep and worsens next-day anxiety baseline.',
     recovery:'Sleep before 2 highest-demand days of the week. Nature exposure 20+ min weekly. Weekly anxiety baseline check. Co-regulation interaction weekly.',
     supplements:['Magnesium glycinate 200mg before bed','L-theanine 200mg as needed (pre-stressor)','Omega-3 (EPA/DHA 1–2g)'],
-    fullscript:'https://us.fullscript.com/welcome/metastoryhealth'
   }
 };
 
@@ -3662,7 +3657,6 @@ function rAssessInsights(){
         <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">
           ${profile.supplements.map(s=>`<div style="font-size:12px;padding:6px 10px;background:var(--surface2);border-radius:8px">💊 ${s}</div>`).join('')}
         </div>
-        <button onclick="window.open('${profile.fullscript}','_blank')" class="btn btn-o btn-f btn-sm">View Supplement Protocol on Fullscript →</button>
       </div>
     </div>`;
   }
