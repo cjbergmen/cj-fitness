@@ -4319,11 +4319,15 @@ function rFoodLibHTML(){
   sorts.forEach(s=>{h+=`<div class="lib-sort-pill${_libSort===s.k?' active':''}" onclick="_libSort='${s.k}';rFoodLib()">${s.l}</div>`;});
   h+=`</div>`;
 
-  // Banner: offer to auto-categorize any items stuck in My Items
+  // Banner: offer to auto-categorize (always visible so user can re-run after fixes)
   const uncatCount=lib.filter(it=>it.cat==='custom'||!it.cat).length;
-  if(uncatCount>0){
+  const libActive=lib.filter(it=>it.cat!=='archived').length;
+  if(libActive>0){
+    const label=uncatCount>0
+      ? `<strong style="color:var(--fg)">${uncatCount} item${uncatCount===1?'':'s'}</strong> in My Items — auto-detect categories?`
+      : `Re-run auto-categorize to fix any miscategorized items`;
     h+=`<div style="background:rgba(122,154,171,.12);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <div style="font-size:12px;color:var(--sub);line-height:1.4"><strong style="color:var(--fg)">${uncatCount} item${uncatCount===1?'':'s'}</strong> in My Items — auto-detect categories?</div>
+      <div style="font-size:12px;color:var(--sub);line-height:1.4">${label}</div>
       <button onclick="autoCategorizeLib()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">✨ Auto-Categorize</button>
     </div>`;
   }
@@ -4664,24 +4668,24 @@ function restoreLibCategories(){
 }
 
 // ── Bulk auto-categorize library items ───────────────────────────────────────
-// Runs guessFoodCat() on every 'custom'/'My Items' entry using noon as the
-// time-of-day fallback (neutral hour so ambiguous items resolve to lunch).
+// Re-categorizes ALL non-archived items (not just 'custom') so wrongly-set
+// categories also get fixed. Uses noon as the time-of-day fallback so
+// ambiguous items resolve to lunch rather than dinner/snacks.
 function autoCategorizeLib(){
   const lib=getLib();
   let changed=0;
   lib.forEach(it=>{
-    if(it.cat==='custom'||!it.cat){
-      const guessed=guessFoodCat(it.n,12); // noon = neutral fallback
-      if(guessed&&guessed!=='custom'){it.cat=guessed;changed++;}
-    }
+    if(it.cat==='archived')return; // never touch archived items
+    const guessed=guessFoodCat(it.n,12); // noon = neutral fallback
+    if(guessed&&guessed!==it.cat){it.cat=guessed;changed++;}
   });
   if(changed){
     putLib(lib);
     fbSyncSettings();
     rFoodLib();
-    showToast(`✅ ${changed} item${changed===1?'':'s'} categorized`);
+    showToast(`✅ ${changed} item${changed===1?'':'s'} re-categorized`);
   } else {
-    showToast('All items already categorized');
+    showToast('All items already look good');
   }
 }
 
@@ -5265,57 +5269,152 @@ function addSearchAsComp(i){
 }
 
 // Auto-detect food category from name + time of day.
-// Priority: keyword match → time-of-day fallback.
-// Used when no library/QM entry already has a category.
+// Uses word-boundary matching to prevent false positives (e.g. "ginger" ≠ "gin").
+// Priority order: drinks → sweets → breakfast → snacks → dinner → lunch → time fallback.
 function guessFoodCat(name, hour){
-  const n=(name||'').toLowerCase();
+  // Normalise: lowercase, collapse hyphens to spaces, pad with spaces for boundary matching
+  const raw=(name||'').toLowerCase().trim().replace(/[-–]/g,' ');
+  const n=' '+raw+' ';
+  // word(w): whole-word match (prevents "gin" matching "ginger")
+  const word=(w)=>n.includes(' '+w+' ');
+  // phrase(w): substring match safe for multi-word phrases
+  const phrase=(w)=>raw.includes(w);
 
-  // ── Drinks ─────────────────────────────────────────────────────────────────
-  const DRINKS=['coffee','latte','espresso','cappuccino','americano','mocha','macchiato',
-    'tea','matcha','chai','water','juice','smoothie',' shake','protein shake',
-    'milk','oat milk','almond milk','soda','coke','pepsi','sprite','sparkling',
-    'kombucha','beer','wine','cocktail','margarita','gin','vodka','rum','whiskey',
-    'bourbon','tequila','tonic','lemonade','gatorade','powerade','energy drink',
-    'red bull','monster','celsius','liquid iv'];
-  if(DRINKS.some(w=>n.includes(w)))return 'drinks';
+  // ── DRINKS ──────────────────────────────────────────────────────────────────
+  // Long unambiguous phrases first
+  if(['protein shake','green smoothie','fruit smoothie','iced coffee','cold brew coffee',
+      'energy drink','sports drink','sparkling water','coconut water','bone broth',
+      'oat milk','almond milk','coconut milk','plant milk',
+      'red bull','monster energy','celsius drink','liquid i.v','liquid iv',
+      'gatorade','powerade','kombucha','bubble tea','boba tea',
+      'white wine','red wine','rose wine','rosé wine','champagne','prosecco',
+      'hard seltzer','white claw','high noon','twisted tea',
+      'rum and coke','vodka soda','gin and tonic','whiskey sour',
+      'margarita','daiquiri','mojito','sangria','mimosa','bloody mary',
+      'hot chocolate','hot cocoa','protein powder drink'
+    ].some(w=>phrase(w)))return 'drinks';
+  // Single words — require word boundary to avoid false positives
+  if(['beer','ale','ipa','lager','stout','porter','pilsner','cider','mead',
+      'sake','soju','gin','rum','vodka','whiskey','bourbon','tequila','brandy',
+      'wine','cocktail','smoothie','milkshake','shake','latte','espresso',
+      'cappuccino','americano','macchiato','mocha','frappuccino',
+      'tea','coffee','juice','soda','water','milk','kefir','chai','matcha'
+    ].some(w=>word(w)))return 'drinks';
 
-  // ── Sweets ─────────────────────────────────────────────────────────────────
-  const SWEETS=['candy','chocolate','ice cream','cake','cookie','brownie',
-    'dessert','pie','doughnut','donut','gummy','marshmallow','toffee','fudge',
-    'pastry','cupcake','pudding','sorbet','gelato','caramel'];
-  if(SWEETS.some(w=>n.includes(w)))return 'sweets';
+  // ── SWEETS ──────────────────────────────────────────────────────────────────
+  if(['ice cream','frozen yogurt','gelato','sorbet','peanut butter cup',
+      'chocolate cake','birthday cake','cheesecake','pound cake',
+      'creme brulee','bread pudding','rice pudding','chia pudding',
+      'dark chocolate','white chocolate','candy bar','cotton candy',
+      'cinnamon roll','sticky bun','pain au chocolat'
+    ].some(w=>phrase(w)))return 'sweets';
+  if(['cookie','cupcake','brownie','candy','toffee','fudge','truffle',
+      'macaron','macaroon','dessert','caramel','pudding','pastry',
+      'tiramisu','mousse','meringue','baklava','mochi','donut','doughnut'
+    ].some(w=>word(w)))return 'sweets';
+  // "cake" and "pie" — word boundary to avoid "pancake", "chicken pot"
+  if(word('cake')||word('pie'))return 'sweets';
 
-  // ── Breakfast ──────────────────────────────────────────────────────────────
-  const BREAKFAST=['egg','oatmeal','oats','pancake','waffle','bagel','cereal',
-    'granola','toast','french toast','bacon','sausage','hash brown','biscuit',
-    'grits','porridge','acai bowl','breakfast burrito','breakfast'];
-  if(BREAKFAST.some(w=>n.includes(w))){
-    // Eggs/bacon at dinner are possible — if it's clearly dinnertime, let time win
+  // ── BREAKFAST ───────────────────────────────────────────────────────────────
+  if(['french toast','avocado toast','acai bowl','overnight oats','steel cut oats',
+      'fried egg','scrambled egg','poached egg','soft boiled egg','hard boiled egg',
+      'eggs benedict','egg white','egg sandwich','breakfast burrito',
+      'breakfast sandwich','breakfast bowl','breakfast plate','breakfast wrap',
+      'hash brown','hashbrown','english muffin','greek yogurt parfait'
+    ].some(w=>phrase(w))){
+    if(hour>=18)return 'dinner'; // breakfast-for-dinner is real
+    return 'breakfast';
+  }
+  if(['oatmeal','oats','granola','waffle','pancake','crepe','bagel',
+      'grits','porridge','muffin','scone','biscuit','breakfast'
+    ].some(w=>word(w))){
     if(hour>=18)return 'dinner';
     return 'breakfast';
   }
+  // Toast — word boundary so it doesn't catch "tostada"
+  if(word('toast')&&!phrase('tostada')){
+    if(hour>=18)return 'dinner'; return 'breakfast';
+  }
+  // Eggs & bacon — plausible at any meal, lean on time
+  if(word('egg')||word('eggs')){
+    if(hour>=17)return 'dinner'; return 'breakfast';
+  }
+  if(phrase('bacon')||word('sausage')){
+    if(hour>=17)return 'dinner'; return 'breakfast';
+  }
 
-  // ── Snacks ─────────────────────────────────────────────────────────────────
-  const SNACKS=['protein bar',' bar','rice cake','cracker','popcorn','pretzel',
-    'trail mix','jerky','nut butter','almond butter','peanut butter','hummus',
-    'apple','banana','orange','grapes','berries','fruit','chips','yogurt'];
-  if(SNACKS.some(w=>n.includes(w)))return 'snacks';
+  // ── SNACKS ──────────────────────────────────────────────────────────────────
+  if(['protein bar','granola bar','energy bar','rice cake','peanut butter',
+      'almond butter','cashew butter','trail mix','mixed nuts','beef jerky',
+      'turkey jerky','protein powder','whey protein','collagen peptide',
+      'cottage cheese','string cheese'
+    ].some(w=>phrase(w)))return 'snacks';
+  if(['cracker','pretzel','popcorn','jerky','chips','almonds','cashews',
+      'walnuts','pecans','pistachios','raisins','edamame',
+      'apple','banana','orange','grapes','berries','mango','pineapple',
+      'strawberry','blueberry','raspberry','melon','cherry','peach','plum',
+      'hummus','guacamole','yogurt','fruit'
+    ].some(w=>word(w)))return 'snacks';
 
-  // ── Lunch-leaning items (but defer to time after 3pm) ──────────────────────
-  const LUNCH_LEAN=['sandwich','wrap','burrito','taco','bowl','sushi','poke',
-    'sub','panini','quesadilla','bento','salad'];
-  if(LUNCH_LEAN.some(w=>n.includes(w))){
+  // ── DINNER (protein-forward meals, cooked dishes) ───────────────────────────
+  // Strongly dinner-associated dishes — return dinner regardless of time
+  if(['bulgogi','bibimbap','galbi','kalbi','tonkatsu','katsu curry',
+      'pad thai','pad see ew','kung pao','general tso','orange chicken',
+      'sesame chicken','teriyaki chicken','chicken parmesan','chicken marsala',
+      'chicken piccata','chicken alfredo','chicken tikka','butter chicken',
+      'beef stroganoff','pot roast','prime rib','short rib','baby back ribs',
+      'rack of lamb','lamb chops','osso buco','coq au vin',
+      'pasta bolognese','spaghetti','lasagna','fettuccine','carbonara','penne arrabiata',
+      'shrimp scampi','lobster tail','crab cakes','fish and chips','fish tacos',
+      'pho bo','ramen','udon noodles','soba noodles',
+      'stir fry','lo mein','chow mein','fried rice','bibim',
+      'enchiladas','carnitas','carne asada','al pastor','chile verde',
+      'roast chicken','rotisserie chicken','grilled salmon','baked salmon',
+      'pork chop','pork tenderloin','pulled pork','braised',
+      'mashed potato','roasted potato','baked potato','sweet potato fries',
+      'chicken thigh','chicken breast','chicken wing','chicken leg',
+      'ground beef','beef patty','brisket',
+      'caesar salad','wedge salad','caprese salad','niçoise'
+    ].some(w=>phrase(w)))return 'dinner';
+  // Protein words — dinner, but could be lunch at midday
+  if(['steak','ribeye','sirloin','filet','tenderloin','brisket','meatball','meatloaf',
+      'salmon','tuna','halibut','cod','tilapia','mahi','snapper','trout','swordfish',
+      'shrimp','lobster','scallop','clams','mussels','oyster','crab',
+      'chicken','turkey','beef','pork','lamb','veal','venison','bison','duck',
+      'ribs','chop','cutlet','roast',
+      'pasta','noodles','ramen','udon','soba','gnocchi','risotto',
+      'curry','stew','chili','casserole','frittata','quiche',
+      'pizza','calzone','flatbread','stromboli',
+      'soup','bisque','chowder','minestrone','posole'
+    ].some(w=>word(w))){
+    // Mid-day these can reasonably be lunch
+    if(hour>=11&&hour<15)return 'lunch';
+    return 'dinner';
+  }
+
+  // ── LUNCH (midday, portable, lighter) ───────────────────────────────────────
+  if(['poke bowl','grain bowl','power bowl','buddha bowl','burrito bowl',
+      'chicken sandwich','turkey sandwich','grilled cheese','club sandwich',
+      'spring roll','egg roll','sushi roll','california roll','dragon roll',
+      'gyro','shawarma','falafel','banh mi'
+    ].some(w=>phrase(w))){
+    if(hour>=17)return 'dinner';
+    return 'lunch';
+  }
+  if(['sandwich','wrap','burrito','taco','bowl','sushi','poke',
+      'sub','panini','quesadilla','bento','salad','gyro','kebab'
+    ].some(w=>word(w))){
     if(hour>=17)return 'dinner';
     if(hour>=15)return 'snacks';
     return 'lunch';
   }
 
-  // ── Time-of-day fallback for everything else ───────────────────────────────
-  if(hour<11)return 'breakfast';           // up to 10:59am
-  if(hour<15)return 'lunch';              // 11am–2:59pm
-  if(hour<17)return 'snacks';             // 3pm–4:59pm
-  if(hour<21)return 'dinner';             // 5pm–8:59pm
-  return 'snacks';                        // 9pm+ late night
+  // ── TIME-OF-DAY FALLBACK ─────────────────────────────────────────────────────
+  if(hour<11)return 'breakfast';
+  if(hour<15)return 'lunch';
+  if(hour<17)return 'snacks';
+  if(hour<22)return 'dinner';
+  return 'snacks';
 }
 
 async function saveFood(){
