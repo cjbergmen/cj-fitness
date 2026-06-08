@@ -1,6 +1,6 @@
 {
   "name": "Metastory Health",
-  "short_name": "Metastory",
+  "short_name": "Metastory Health",
   "start_url": "https://app.metastoryhealth.com/",
   "display": "standalone",
   "background_color": "#f1ede5",
