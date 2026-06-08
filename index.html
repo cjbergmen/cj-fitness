@@ -5310,7 +5310,9 @@ function guessFoodCat(name, hour){
     ].some(w=>phrase(w)))return 'sweets';
   if(['cookie','cupcake','brownie','candy','toffee','fudge','truffle',
       'macaron','macaroon','dessert','caramel','pudding','pastry',
-      'tiramisu','mousse','meringue','baklava','mochi','donut','doughnut'
+      'tiramisu','mousse','meringue','baklava','mochi','donut','doughnut',
+      'chocolate','sweets','gummy','gummies','lollipop','licorice',
+      'marshmallow','nougat','taffy','brittle'
     ].some(w=>word(w)))return 'sweets';
   // "cake" and "pie" — word boundary to avoid "pancake", "chicken pot"
   if(word('cake')||word('pie'))return 'sweets';
@@ -5326,7 +5328,8 @@ function guessFoodCat(name, hour){
     return 'breakfast';
   }
   if(['oatmeal','oats','granola','waffle','pancake','crepe','bagel',
-      'grits','porridge','muffin','scone','biscuit','breakfast'
+      'grits','porridge','muffin','scone','biscuit','breakfast',
+      'omelet','omelette','frittata'
     ].some(w=>word(w))){
     if(hour>=18)return 'dinner';
     return 'breakfast';
@@ -5383,7 +5386,7 @@ function guessFoodCat(name, hour){
       'chicken','turkey','beef','pork','lamb','veal','venison','bison','duck',
       'ribs','chop','cutlet','roast',
       'pasta','noodles','ramen','udon','soba','gnocchi','risotto',
-      'curry','stew','chili','casserole','frittata','quiche',
+      'curry','stew','chili','casserole','quiche',
       'pizza','calzone','flatbread','stromboli',
       'soup','bisque','chowder','minestrone','posole'
     ].some(w=>word(w))){
