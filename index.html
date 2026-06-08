@@ -4319,6 +4319,15 @@ function rFoodLibHTML(){
   sorts.forEach(s=>{h+=`<div class="lib-sort-pill${_libSort===s.k?' active':''}" onclick="_libSort='${s.k}';rFoodLib()">${s.l}</div>`;});
   h+=`</div>`;
 
+  // Banner: offer to auto-categorize any items stuck in My Items
+  const uncatCount=lib.filter(it=>it.cat==='custom'||!it.cat).length;
+  if(uncatCount>0){
+    h+=`<div style="background:rgba(122,154,171,.12);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="font-size:12px;color:var(--sub);line-height:1.4"><strong style="color:var(--fg)">${uncatCount} item${uncatCount===1?'':'s'}</strong> in My Items — auto-detect categories?</div>
+      <button onclick="autoCategorizeLib()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">✨ Auto-Categorize</button>
+    </div>`;
+  }
+
   if(!filtered.length){
     h+=`<div class="empty"><div style="font-size:36px;margin-bottom:8px">📚</div><div>${lib.length?'No items match':'Your library is empty'}</div></div>`;
   }else{
@@ -4652,6 +4661,28 @@ function restoreLibCategories(){
   });
   if(changed){putLib(lib);fbSyncSettings();}
   return changed;
+}
+
+// ── Bulk auto-categorize library items ───────────────────────────────────────
+// Runs guessFoodCat() on every 'custom'/'My Items' entry using noon as the
+// time-of-day fallback (neutral hour so ambiguous items resolve to lunch).
+function autoCategorizeLib(){
+  const lib=getLib();
+  let changed=0;
+  lib.forEach(it=>{
+    if(it.cat==='custom'||!it.cat){
+      const guessed=guessFoodCat(it.n,12); // noon = neutral fallback
+      if(guessed&&guessed!=='custom'){it.cat=guessed;changed++;}
+    }
+  });
+  if(changed){
+    putLib(lib);
+    fbSyncSettings();
+    rFoodLib();
+    showToast(`✅ ${changed} item${changed===1?'':'s'} categorized`);
+  } else {
+    showToast('All items already categorized');
+  }
 }
 
 // ── Frequency tracking ────────────────────────────────────────
@@ -5233,6 +5264,60 @@ function addSearchAsComp(i){
   document.getElementById('fi-search').value='';
 }
 
+// Auto-detect food category from name + time of day.
+// Priority: keyword match → time-of-day fallback.
+// Used when no library/QM entry already has a category.
+function guessFoodCat(name, hour){
+  const n=(name||'').toLowerCase();
+
+  // ── Drinks ─────────────────────────────────────────────────────────────────
+  const DRINKS=['coffee','latte','espresso','cappuccino','americano','mocha','macchiato',
+    'tea','matcha','chai','water','juice','smoothie',' shake','protein shake',
+    'milk','oat milk','almond milk','soda','coke','pepsi','sprite','sparkling',
+    'kombucha','beer','wine','cocktail','margarita','gin','vodka','rum','whiskey',
+    'bourbon','tequila','tonic','lemonade','gatorade','powerade','energy drink',
+    'red bull','monster','celsius','liquid iv'];
+  if(DRINKS.some(w=>n.includes(w)))return 'drinks';
+
+  // ── Sweets ─────────────────────────────────────────────────────────────────
+  const SWEETS=['candy','chocolate','ice cream','cake','cookie','brownie',
+    'dessert','pie','doughnut','donut','gummy','marshmallow','toffee','fudge',
+    'pastry','cupcake','pudding','sorbet','gelato','caramel'];
+  if(SWEETS.some(w=>n.includes(w)))return 'sweets';
+
+  // ── Breakfast ──────────────────────────────────────────────────────────────
+  const BREAKFAST=['egg','oatmeal','oats','pancake','waffle','bagel','cereal',
+    'granola','toast','french toast','bacon','sausage','hash brown','biscuit',
+    'grits','porridge','acai bowl','breakfast burrito','breakfast'];
+  if(BREAKFAST.some(w=>n.includes(w))){
+    // Eggs/bacon at dinner are possible — if it's clearly dinnertime, let time win
+    if(hour>=18)return 'dinner';
+    return 'breakfast';
+  }
+
+  // ── Snacks ─────────────────────────────────────────────────────────────────
+  const SNACKS=['protein bar',' bar','rice cake','cracker','popcorn','pretzel',
+    'trail mix','jerky','nut butter','almond butter','peanut butter','hummus',
+    'apple','banana','orange','grapes','berries','fruit','chips','yogurt'];
+  if(SNACKS.some(w=>n.includes(w)))return 'snacks';
+
+  // ── Lunch-leaning items (but defer to time after 3pm) ──────────────────────
+  const LUNCH_LEAN=['sandwich','wrap','burrito','taco','bowl','sushi','poke',
+    'sub','panini','quesadilla','bento','salad'];
+  if(LUNCH_LEAN.some(w=>n.includes(w))){
+    if(hour>=17)return 'dinner';
+    if(hour>=15)return 'snacks';
+    return 'lunch';
+  }
+
+  // ── Time-of-day fallback for everything else ───────────────────────────────
+  if(hour<11)return 'breakfast';           // up to 10:59am
+  if(hour<15)return 'lunch';              // 11am–2:59pm
+  if(hour<17)return 'snacks';             // 3pm–4:59pm
+  if(hour<21)return 'dinner';             // 5pm–8:59pm
+  return 'snacks';                        // 9pm+ late night
+}
+
 async function saveFood(){
   const nameEl=document.getElementById('fi-name');
   const name=(nameEl?nameEl.value||'':'').trim();
@@ -5256,7 +5341,7 @@ async function saveFood(){
     // Preserve category from library/QM so importHistoryToLib can recover it on rebuild
     const _libMatch=getLib().find(x=>x.n.toLowerCase()===name.toLowerCase());
     const _qmMatch=QM.find(x=>x.n.toLowerCase()===name.toLowerCase());
-    const _logCat=(_libMatch&&_libMatch.cat)||(_qmMatch&&_qmMatch.cat)||'custom';
+    const _logCat=(_libMatch&&_libMatch.cat)||(_qmMatch&&_qmMatch.cat)||guessFoodCat(name,now.getHours());
     log.push({name,emoji:curEmoji||'🍽️',cat:_logCat,
       time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),p,c,f,k});
     if(!putLog(log)){
@@ -5332,11 +5417,23 @@ function _swTimerMsg(msg){
 }
 // Request notification permission (called once on first timer start)
 function _reqNotifPerm(){
-  if(typeof Notification==='undefined')return;
+  if(typeof Notification==='undefined'){
+    // iOS Safari in-browser: Web Push requires app added to Home Screen (iOS 16.4+)
+    if(!_notifToastShown){
+      _notifToastShown=true;
+      showToast('📲 Add to Home Screen to get background bell',3500);
+    }
+    return;
+  }
   if(Notification.permission==='default'){
-    Notification.requestPermission().catch(()=>{});
+    Notification.requestPermission()
+      .then(p=>{ if(p==='denied') showToast('Enable notifications for background bell',3000); })
+      .catch(()=>{});
+  } else if(Notification.permission==='denied'){
+    if(!_notifToastShown){ _notifToastShown=true; showToast('Notifications blocked — enable in iOS Settings',3000); }
   }
 }
+let _notifToastShown=false;
 
 function openTimer(title,sec){
   _timerClear();
@@ -5438,9 +5535,19 @@ function _getAudioCtx(){
   return _audioCtx;
 }
 function _unlockAudio(){
-  // Call on any user tap so iOS keeps the context running
   const ctx=_getAudioCtx();
-  if(ctx&&ctx.state==='suspended')ctx.resume().catch(()=>{});
+  if(!ctx)return;
+  // iOS Safari requires an actual audio event scheduled during a user gesture
+  // to properly unlock the AudioContext — ctx.resume() alone is not reliable.
+  // Playing a 1-frame silent buffer satisfies this without making any sound.
+  try{
+    const buf=ctx.createBuffer(1,1,22050);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  }catch(e){}
+  if(ctx.state==='suspended')ctx.resume().catch(()=>{});
 }
 function playAlarm(){
   if(navigator.vibrate)navigator.vibrate([300,150,300,150,300]);
