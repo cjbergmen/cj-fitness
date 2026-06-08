@@ -378,6 +378,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
             <button onclick="openSettings();closeUserMenu()" style="display:block;width:100%;text-align:left;padding:12px 16px;background:none;border:none;color:var(--text);font-size:14px;font-weight:500;cursor:pointer">⚙️ Settings</button>
             <div style="height:1px;background:var(--border)"></div>
             <button id="user-menu-auth-btn" onclick="handleUserMenuAuth();closeUserMenu()" style="display:block;width:100%;text-align:left;padding:12px 16px;background:none;border:none;color:var(--sub);font-size:14px;font-weight:500;cursor:pointer">Sign In with Google</button>
+            <div style="height:1px;background:var(--border)"></div>
+            <button onclick="location.reload(true);closeUserMenu()" style="display:block;width:100%;text-align:left;padding:12px 16px;background:none;border:none;color:var(--sub);font-size:14px;font-weight:500;cursor:pointer">🔄 Reload App</button>
           </div>
         </div>
       </div>
@@ -5291,56 +5293,128 @@ function closeWater(){document.getElementById('water-ov').classList.remove('open
 function saveCustomWater(){const v=parseFloat(document.getElementById('fi-w').value);if(v>0){addWater(v);closeWater()}}
 
 // ── TIMER ─────────────────────────────────────────────────────────────────────
-let timerSec=0,timerOn=false,timerIv=null,timerInit=0;
+// Uses wall-clock timestamps so the countdown stays accurate in the background.
+// timerEndMs = epoch ms when the timer will reach zero; computed once on start/resume.
+// On each tick we derive timerSec from (timerEndMs - Date.now()) rather than
+// decrementing, so iOS throttling / tab-switch pauses never cause drift.
+let timerSec=0,timerOn=false,timerIv=null,timerInit=0,timerEndMs=0;
+
+function _timerSave(){
+  try{if(timerOn&&timerEndMs>0){localStorage.setItem('_timerEndMs',String(timerEndMs));localStorage.setItem('_timerInit',String(timerInit));}
+  else{localStorage.removeItem('_timerEndMs');}}catch(e){}
+}
+function _timerClear(){
+  clearInterval(timerIv);timerIv=null;timerOn=false;timerEndMs=0;
+  try{localStorage.removeItem('_timerEndMs');}catch(e){}
+  _swTimerMsg({type:'CANCEL_TIMER_NOTIF'});
+}
+function _timerTick(){
+  if(!timerEndMs){return;}
+  timerSec=Math.max(0,Math.ceil((timerEndMs-Date.now())/1000));
+  updTimer();
+  if(timerSec<=0){
+    _timerClear();
+    document.getElementById('timer-btn').textContent='Done';
+    playAlarm();
+  }
+}
+function _startInterval(){
+  // 250ms poll so returning from background catches up quickly
+  timerIv=setInterval(_timerTick,250);
+}
+// Send a message to the service worker (for background notifications)
+function _swTimerMsg(msg){
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.controller){
+      navigator.serviceWorker.controller.postMessage(msg);
+    }
+  }catch(e){}
+}
+// Request notification permission (called once on first timer start)
+function _reqNotifPerm(){
+  if(typeof Notification==='undefined')return;
+  if(Notification.permission==='default'){
+    Notification.requestPermission().catch(()=>{});
+  }
+}
+
 function openTimer(title,sec){
-  // Clear any background interval first — closeTimer keeps the previous
-  // countdown alive in the background, and without this clear it would keep
-  // decrementing the new timerSec we set below (double-ticks per second,
-  // plus the wrong duration).
-  if(timerIv){clearInterval(timerIv);timerIv=null;}
+  _timerClear();
   document.getElementById('timer-title').textContent=title;
-  timerSec=sec;timerInit=sec;timerOn=false;
+  timerSec=sec;timerInit=sec;
   document.getElementById('timer-btn').textContent='Start';
   updTimer();
   updTimerFab();
   document.getElementById('timer-ov').classList.add('open');
 }
 function closeTimer(){
-  // Do NOT stop the timer — let it run in background
-  timerOn=false;
-  clearInterval(timerIv);
-  timerIv=null;
+  clearInterval(timerIv);timerIv=null;
   document.getElementById('timer-ov').classList.remove('open');
-  // If timer still has time left, restart it silently and show FAB
-  if(timerSec>0){
-    timerOn=true;
-    timerIv=setInterval(()=>{timerSec--;updTimer();
-      if(timerSec<=0){clearInterval(timerIv);timerIv=null;timerOn=false;
-        document.getElementById('timer-btn').textContent='Done';
-        playAlarm();
-      }
-    },1000);
+  // Keep running in background if there's time left
+  if(timerSec>0&&timerOn){
+    // timerEndMs already set — just restart the poll interval
+    _startInterval();
+  } else if(timerSec>0&&!timerOn){
+    // Timer was paused when closed — leave paused, no background tick
   }
   updTimerFab();
 }
 function timerToggle(){
-  if(timerOn){clearInterval(timerIv);timerIv=null;timerOn=false;document.getElementById('timer-btn').textContent='Resume';updTimerFab();}
-  else{timerOn=true;document.getElementById('timer-btn').textContent='Pause';
-    timerIv=setInterval(()=>{timerSec--;updTimer();
-      if(timerSec<=0){clearInterval(timerIv);timerIv=null;timerOn=false;document.getElementById('timer-btn').textContent='Done';
-        playAlarm();
-      }
-    },1000);
+  if(timerOn){
+    _timerClear(); // also cancels SW notification
+    document.getElementById('timer-btn').textContent='Resume';
+    updTimerFab();
+  } else {
+    _reqNotifPerm();
+    _unlockAudio(); // unlock iOS audio context while we're in a user gesture
+    timerOn=true;
+    timerEndMs=Date.now()+(timerSec*1000);
+    _timerSave();
+    // Schedule background notification via SW
+    _swTimerMsg({type:'SCHEDULE_TIMER_NOTIF',delayMs:timerSec*1000,
+      title:'⏱ Rest Over',body:"Time to get back to it!"});
+    document.getElementById('timer-btn').textContent='Pause';
+    _startInterval();
     updTimerFab();
   }
 }
-function timerReset(){clearInterval(timerIv);timerIv=null;timerOn=false;timerSec=timerInit;document.getElementById('timer-btn').textContent='Start';updTimer();updTimerFab();}
+function timerReset(){
+  _timerClear();
+  timerSec=timerInit;
+  document.getElementById('timer-btn').textContent='Start';
+  updTimer();updTimerFab();
+}
 function updTimer(){
   const s=Math.max(0,timerSec),m=Math.floor(s/60);
   const txt=String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
   document.getElementById('timer-disp').textContent=txt;
   updTimerFab();
 }
+
+// Restore timer after page reload (e.g. PWA re-open)
+setTimeout(()=>{
+  try{
+    const endMs=parseInt(localStorage.getItem('_timerEndMs')||'0');
+    const init=parseInt(localStorage.getItem('_timerInit')||'0');
+    if(endMs>Date.now()){
+      timerInit=init;timerEndMs=endMs;timerOn=true;
+      timerSec=Math.ceil((endMs-Date.now())/1000);
+      // Re-register SW notification for remaining time (in case SW was restarted)
+      _swTimerMsg({type:'SCHEDULE_TIMER_NOTIF',delayMs:timerSec*1000,
+        title:'⏱ Rest Over',body:"Time to get back to it!"});
+      _startInterval();updTimerFab();
+    } else if(endMs){
+      // Timer expired while page was closed — play alarm now
+      try{localStorage.removeItem('_timerEndMs');}catch(e){}
+      playAlarm();
+    }
+  }catch(e){}
+},0);
+
+// Immediately resync when app comes back to foreground
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&timerOn&&timerEndMs)_timerTick();
+});
 function updTimerFab(){
   const fab=document.getElementById('timer-fab');
   const disp=document.getElementById('timer-fab-disp');
@@ -5354,23 +5428,44 @@ function updTimerFab(){
     fab.style.display='none';
   }
 }
+// Shared AudioContext — created once, unlocked on user gesture, reused for alarm.
+// iOS Safari suspends audio unless the context was created/resumed during a tap.
+let _audioCtx=null;
+function _getAudioCtx(){
+  if(!_audioCtx){
+    try{_audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}
+  }
+  return _audioCtx;
+}
+function _unlockAudio(){
+  // Call on any user tap so iOS keeps the context running
+  const ctx=_getAudioCtx();
+  if(ctx&&ctx.state==='suspended')ctx.resume().catch(()=>{});
+}
 function playAlarm(){
   if(navigator.vibrate)navigator.vibrate([300,150,300,150,300]);
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const beep=(start,dur,freq)=>{
-      const o=ctx.createOscillator();
-      const g=ctx.createGain();
-      o.connect(g);g.connect(ctx.destination);
-      o.type='sine';o.frequency.value=freq;
-      g.gain.setValueAtTime(0,start);
-      g.gain.linearRampToValueAtTime(0.6,start+0.02);
-      g.gain.linearRampToValueAtTime(0,start+dur-0.02);
-      o.start(start);o.stop(start+dur);
+    const ctx=_getAudioCtx();
+    if(!ctx)return;
+    const play=()=>{
+      const beep=(start,dur,freq)=>{
+        const o=ctx.createOscillator();
+        const g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.type='sine';o.frequency.value=freq;
+        g.gain.setValueAtTime(0,start);
+        g.gain.linearRampToValueAtTime(0.6,start+0.02);
+        g.gain.linearRampToValueAtTime(0,start+dur-0.02);
+        o.start(start);o.stop(start+dur);
+      };
+      const t=ctx.currentTime;
+      beep(t,0.18,880);
+      beep(t+0.25,0.18,880);
+      beep(t+0.5,0.32,1100);
     };
-    beep(ctx.currentTime,0.18,880);
-    beep(ctx.currentTime+0.25,0.18,880);
-    beep(ctx.currentTime+0.5,0.32,1100);
+    // resume() is required if context was suspended (iOS default state)
+    if(ctx.state==='suspended'){ctx.resume().then(play).catch(()=>{});}
+    else{play();}
   }catch(e){}
 }
 
