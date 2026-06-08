@@ -748,6 +748,41 @@ function rSettingsModal(){
       <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="resetWorkoutPlan()">↩️ Reset to Default Plan</button>
     </div>
     <div class="card" style="margin-bottom:10px">
+      <div class="ct">🎯 Nutrition Targets</div>
+      ${(()=>{
+        let t={train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}};
+        try{const s=lsGet('_userTargets','');if(s){const u=JSON.parse(s);if(u&&u.train&&u.rest)t=u;}}catch(e){}
+        const row=(label,id,val,unit)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+          <span style="font-size:13px;color:var(--sub);min-width:80px">${label}</span>
+          <div style="display:flex;align-items:center;gap:5px">
+            <input id="${id}" type="number" inputmode="decimal" class="fi" value="${val}" style="width:80px;padding:7px 10px;font-size:16px;text-align:center">
+            <span style="font-size:12px;color:var(--sub);min-width:20px">${unit}</span>
+          </div>
+        </div>`;
+        return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🏋️ Training Day</div>
+            ${row('Protein','nt-tr-p',t.train.p,'g')}
+            ${row('Carbs','nt-tr-c',t.train.c,'g')}
+            ${row('Fat','nt-tr-f',t.train.f,'g')}
+            ${row('Calories','nt-tr-k',t.train.k,'kcal')}
+            ${row('Water','nt-tr-w',t.train.w,'oz')}
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">😴 Rest Day</div>
+            ${row('Protein','nt-rs-p',t.rest.p,'g')}
+            ${row('Carbs','nt-rs-c',t.rest.c,'g')}
+            ${row('Fat','nt-rs-f',t.rest.f,'g')}
+            ${row('Calories','nt-rs-k',t.rest.k,'kcal')}
+            ${row('Water','nt-rs-w',t.rest.w,'oz')}
+          </div>
+        </div>
+        <div id="nt-save-msg" style="font-size:12px;color:var(--green);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
+        <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()">💾 Save Targets</button>`;
+      })()}
+    </div>
+    <div class="card" style="margin-bottom:10px">
       <div class="ct">🩺 Practitioner Report</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Received a report code from your Metastory Health practitioner? Paste it below to import their recommendations into your app.</div>
       ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
@@ -2317,6 +2352,18 @@ function getTgt(){
   const custom=lsGet('_userTargets','');
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isTrain()?t.train:t.rest;}catch(e){}}
   return isTrain()?{p:150,c:200,f:65,k:2100,w:90}:{p:125,c:160,f:55,k:1750,w:75};
+}
+function saveNutritionTargets(){
+  const g=(id)=>Math.max(0,+(document.getElementById(id)?.value||0));
+  const nt={
+    train:{p:g('nt-tr-p'),c:g('nt-tr-c'),f:g('nt-tr-f'),k:g('nt-tr-k'),w:g('nt-tr-w')},
+    rest: {p:g('nt-rs-p'),c:g('nt-rs-c'),f:g('nt-rs-f'),k:g('nt-rs-k'),w:g('nt-rs-w')}
+  };
+  lsSet('_userTargets',JSON.stringify(nt));
+  fbSyncSettings();
+  refresh();
+  const msg=document.getElementById('nt-save-msg');
+  if(msg){msg.textContent='✅ Saved!';setTimeout(()=>{msg.textContent='';},2500);}
 }
 function getMacros(){return getLog().reduce((t,e)=>({p:t.p+(+e.p||0),c:t.c+(+e.c||0),f:t.f+(+e.f||0),k:t.k+(+e.k||0)}),{p:0,c:0,f:0,k:0})}
 function pct(v,t){return Math.min(100,Math.round(v/t*100))}
