@@ -164,7 +164,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .wo-chips{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
 .wo-chip{padding:7px 11px;border-radius:20px;font-size:12px;font-weight:600;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);cursor:pointer}
 .wo-chip.sel{background:rgba(171,108,82,.25);border-color:var(--green);color:var(--green)}
-.wo-wt-sel{width:100%;padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:15px;font-weight:600;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b7baa7' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;margin-bottom:9px}
+.wo-wt-sel{width:100%;padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:16px;font-weight:600;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b7baa7' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;margin-bottom:9px}
 .wo-wt-sel:focus{border-color:var(--green)}
 .wo-done-ex-btn{flex:1;padding:10px;background:rgba(171,108,82,.15);border:1.5px solid var(--green);border-radius:var(--rs);color:var(--green);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.3px}
 .wo-done-ex-btn:active{background:rgba(171,108,82,.3)}
@@ -240,7 +240,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .suggest-card-macros{display:flex;gap:8px;font-size:12px;margin-bottom:9px;flex-wrap:wrap}
 .suggest-card-macros span{font-weight:700}
 .suggest-log-btn{width:100%;padding:8px;border-radius:var(--rs);border:none;background:var(--green);color:#fff;font-size:13px;font-weight:700;cursor:pointer}
-.lib-search{width:100%;padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:14px;outline:none;margin-bottom:10px;-webkit-appearance:none;box-sizing:border-box}
+.lib-search{width:100%;padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:16px;outline:none;margin-bottom:10px;-webkit-appearance:none;box-sizing:border-box}
 .lib-search:focus{border-color:var(--green)}
 .lib-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;scrollbar-width:none}
 .lib-cats::-webkit-scrollbar{display:none}
@@ -465,7 +465,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="fg"><label class="fl">Meal Name</label><input class="fi" id="fi-name" type="text" placeholder="e.g. Morning Shake" autocomplete="off"></div>
     <div class="fg">
       <input type="file" accept="image/*" id="fi-ai-photo" style="display:none" onchange="addAIPhoto(this)" multiple>
-      <textarea id="ai-scan-ctx" class="fi" rows="3" placeholder="Describe your meal — e.g. &quot;grilled chicken breast, roasted sweet potato, side salad&quot; — or add a photo below" style="margin-bottom:8px;font-size:13px;resize:none" oninput="aiScanCtxChanged()"></textarea>
+      <textarea id="ai-scan-ctx" class="fi" rows="3" placeholder="Describe your meal — e.g. &quot;grilled chicken breast, roasted sweet potato, side salad&quot; — or add a photo below" style="margin-bottom:8px;font-size:16px;resize:none" oninput="aiScanCtxChanged()"></textarea>
       <div id="ai-photo-strip" class="ai-photo-strip" style="display:none"></div>
       <button class="btn btn-s btn-f btn-sm" style="width:100%;margin-bottom:7px;font-size:12px;color:var(--sub)" id="ai-add-btn" onclick="document.getElementById('fi-ai-photo').click()">📸 Add Photo (optional)</button>
       <button class="btn btn-g btn-f btn-sm" style="width:100%;margin-bottom:7px" id="ai-analyze-btn" onclick="runAIScan()">✨ Analyze Meal</button>
@@ -751,7 +751,7 @@ function rSettingsModal(){
       <div class="ct">🩺 Practitioner Report</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Received a report code from your Metastory Health practitioner? Paste it below to import their recommendations into your app.</div>
       ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
-      <textarea id="pract-code-input" class="fi" rows="2" placeholder="Paste your MSH-RPT-... code here" style="margin-bottom:8px;font-size:12px;font-family:monospace;resize:none"></textarea>
+      <textarea id="pract-code-input" class="fi" rows="2" placeholder="Paste your MSH-RPT-... code here" style="margin-bottom:8px;font-size:16px;font-family:monospace;resize:none"></textarea>
       <button class="btn btn-g btn-sm btn-f" onclick="importPractitionerReport()">Import Report</button>
     </div>
     <div class="card" style="margin-bottom:10px">
@@ -4359,7 +4359,7 @@ function rFoodLibHTML(){
           </div>
           <div style="margin-bottom:12px">
             <label class="fl">Category</label>
-            <select class="fi" id="lib-cat-${item.id}" style="font-size:13px;padding:8px 10px" onchange="libSetCat('${item.id}',this.value)">
+            <select class="fi" id="lib-cat-${item.id}" style="font-size:16px;padding:8px 10px" onchange="libSetCat('${item.id}',this.value)">
               ${catOpts.map(([v,l])=>`<option value="${v}"${itemCat===v?' selected':''}>${l}</option>`).join('')}
             </select>
           </div>`;
@@ -7844,7 +7844,7 @@ if('serviceWorker' in navigator){
       </div>
       <div class="fg">
         <label class="fl">Category</label>
-        <select class="fi" id="recipe-cat" style="font-size:13px;padding:8px 10px">
+        <select class="fi" id="recipe-cat" style="font-size:16px;padding:8px 10px">
           <option value="breakfast">🌅 Breakfast</option>
           <option value="lunch">☀️ Lunch</option>
           <option value="dinner" selected>🌙 Dinner</option>
