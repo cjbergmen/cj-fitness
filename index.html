@@ -29,7 +29,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 #hdr{padding:calc(var(--st) + 14px) 18px 12px;background:var(--bg);border-bottom:0.5px solid var(--border);flex-shrink:0}
 #hdr h1{font-size:24px;font-weight:400;font-family:var(--font-serif);letter-spacing:-.2px}
 #hdr .sub{font-size:12px;color:var(--sub);margin-top:2px;font-family:var(--font-sans)}
-#pages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:16px}
+#pages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:16px;overscroll-behavior-y:contain;position:relative}
+#ptr{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;height:0;overflow:visible;pointer-events:none;z-index:50}
+#ptr-inner{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;color:var(--sub);box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(-10px);transition:opacity .15s}
+#ptr-spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;display:inline-block}
+#ptr.spinning #ptr-spin{animation:ptrspin .7s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
 #pages::-webkit-scrollbar{display:none}
 .page{display:none;padding:14px}
 .page.active{display:block}
@@ -397,6 +402,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     </div>
   </div>
   <div id="pages">
+    <div id="ptr"><div id="ptr-inner"><span id="ptr-spin"></span><span id="ptr-label">Pull to refresh</span></div></div>
     <div class="page active" id="page-today"></div>
     <div class="page" id="page-workout"></div>
     <div class="page" id="page-food"></div>
@@ -6048,6 +6054,49 @@ function cardTimerClick(idx,initSec){
     },1000);
   }
 }
+
+// ── PULL TO REFRESH ───────────────────────────────────────────────────────────
+(function(){
+  const pages=document.getElementById('pages');
+  const ptr=document.getElementById('ptr');
+  const inner=document.getElementById('ptr-inner');
+  const label=document.getElementById('ptr-label');
+  if(!pages||!ptr)return;
+  const THRESH=75;
+  let startY=0,pulling=false,dist=0,refreshing=false;
+  function anyModalOpen(){return !!document.querySelector('.ov.open, #wiz-overlay.open');}
+  pages.addEventListener('touchstart',e=>{
+    if(refreshing||anyModalOpen())return;
+    if(pages.scrollTop<=0){startY=e.touches[0].clientY;pulling=true;dist=0;}
+  },{passive:true});
+  pages.addEventListener('touchmove',e=>{
+    if(!pulling||refreshing)return;
+    dist=e.touches[0].clientY-startY;
+    if(dist>12&&pages.scrollTop<=0){
+      const d=Math.min(dist,140);
+      inner.style.opacity='1';
+      inner.style.transform='translateY('+(d*0.55)+'px)';
+      label.textContent=d>=THRESH?'Release to refresh':'Pull to refresh';
+    }else{
+      inner.style.opacity='0';
+    }
+  },{passive:true});
+  pages.addEventListener('touchend',()=>{
+    if(!pulling||refreshing)return;
+    pulling=false;
+    if(dist>=THRESH&&pages.scrollTop<=0){
+      refreshing=true;
+      ptr.classList.add('spinning');
+      label.textContent='Refreshing…';
+      inner.style.opacity='1';
+      inner.style.transform='translateY(46px)';
+      setTimeout(()=>{location.reload();},350);
+    }else{
+      inner.style.opacity='0';
+      inner.style.transform='translateY(-10px)';
+    }
+  });
+})();
 
 // ── MODAL CLOSE ON OVERLAY TAP ────────────────────────────────────────────────
 ['food-ov','water-ov','timer-ov','usr-ov','key-ov','settings-ov','recipe-ov','checkin-ov'].forEach(id=>{
