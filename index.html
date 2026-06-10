@@ -534,6 +534,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="mh"></div>
     <div class="mt2" id="ck-title">How was this meal?</div>
     <div style="font-size:12px;color:var(--sub);margin:-10px 0 14px">Optional — a few seconds now builds your metastory over time.</div>
+    <div class="fg"><label class="fl">Time eaten</label><input class="fi" id="ck-time" type="time" style="max-width:140px"></div>
     <div class="fg"><label class="fl">Mood before eating</label><div id="ck-before" class="ck-chips"></div></div>
     <div class="fg"><label class="fl">Mood after eating</label><div id="ck-after" class="ck-chips"></div></div>
     <div class="fg"><label class="fl">While eating, I was…</label><div id="ck-ctx" class="ck-chips"></div></div>
@@ -5548,7 +5549,7 @@ function delFood(i){
 const CK_MOODS=['Calm','Content','Energized','Tired','Stressed','Anxious','Bored','Irritable','Sad','Numb'];
 const CK_CTX=[['relaxing','Relaxing'],['with_people','With people'],['eating_slowly','Eating slowly'],['in_a_rush','In a rush'],['on_the_go','On the go'],['getting_it_down','Just getting it down']];
 let _ckSel={before:null,after:null,ctx:[]};
-let _ckDate=null,_ckIdx=null;
+let _ckDate=null,_ckIdx=null,_ckTime0=null;
 
 function openMealCheckin(){
   try{
@@ -5559,6 +5560,12 @@ function openMealCheckin(){
     const e=log[_ckIdx];
     const t=document.getElementById('ck-title');
     if(t)t.textContent=(e.emoji||'🍽️')+' '+(e.name||'This meal');
+    const ti=document.getElementById('ck-time');
+    if(ti){
+      const d=e.ts?new Date(e.ts):new Date();
+      ti.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      _ckTime0=ti.value;
+    }
     rCheckin();
     document.getElementById('checkin-ov').classList.add('open');
   }catch(err){console.error('checkin open error',err);}
@@ -5575,16 +5582,29 @@ function closeCheckin(){document.getElementById('checkin-ov').classList.remove('
 function skipCheckin(){closeCheckin();}
 function saveCheckin(){
   try{
-    if(_ckDate&&_ckIdx!==null&&(_ckSel.before||_ckSel.after||_ckSel.ctx.length)){
+    const ti=document.getElementById('ck-time');
+    const timeChanged=!!(ti&&ti.value&&ti.value!==_ckTime0);
+    if(_ckDate&&_ckIdx!==null&&(_ckSel.before||_ckSel.after||_ckSel.ctx.length||timeChanged)){
       const log=JSON.parse(lsGet('fl_'+_ckDate,'[]'));
       const e=log[_ckIdx];
       if(e){
         if(_ckSel.before)e.moodBefore=_ckSel.before;
         if(_ckSel.after)e.moodAfter=_ckSel.after;
         if(_ckSel.ctx.length)e.eatCtx=_ckSel.ctx.slice();
+        if(timeChanged){
+          const d=new Date(_ckDate+'T'+ti.value);
+          if(!isNaN(d.getTime())){
+            e.ts=d.getTime();
+            e.timeEdited=true;
+            const disp=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+            if(e.t!==undefined)e.t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+            else e.time=disp;
+          }
+        }
         e.checkinAt=Date.now();
         lsSet('fl_'+_ckDate,JSON.stringify(log));
         try{fbSyncFoodLog(_ckDate,log);}catch(err){}
+        rFood();if(curPage==='today')rToday();
       }
     }
   }catch(err){console.error('checkin save error',err);}
