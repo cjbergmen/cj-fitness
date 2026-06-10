@@ -5548,7 +5548,7 @@ function delFood(i){
 // ── MEAL CHECK-IN (mood + eating context) ─────────────────────────────────
 const CK_MOODS=['Calm','Content','Energized','Tired','Stressed','Anxious','Bored','Irritable','Sad','Numb'];
 const CK_CTX=[['relaxing','Relaxing'],['with_people','With people'],['eating_slowly','Eating slowly'],['in_a_rush','In a rush'],['on_the_go','On the go'],['getting_it_down','Just getting it down']];
-let _ckSel={before:null,after:null,ctx:[]};
+let _ckSel={before:[],after:[],ctx:[]};
 let _ckDate=null,_ckIdx=null,_ckTime0=null;
 
 function openMealCheckin(){
@@ -5556,7 +5556,7 @@ function openMealCheckin(){
     const log=getLog();
     if(!log.length)return;
     _ckDate=viewDate;_ckIdx=log.length-1;
-    _ckSel={before:null,after:null,ctx:[]};
+    _ckSel={before:[],after:[],ctx:[]};
     const e=log[_ckIdx];
     const t=document.getElementById('ck-title');
     if(t)t.textContent=(e.emoji||'🍽️')+' '+(e.name||'This meal');
@@ -5571,12 +5571,12 @@ function openMealCheckin(){
   }catch(err){console.error('checkin open error',err);}
 }
 function rCheckin(){
-  const mk=(group)=>CK_MOODS.map(w=>`<button class="ck-chip${_ckSel[group]===w?' on':''}" onclick="ckMood('${group}','${w}')">${w}</button>`).join('');
+  const mk=(group)=>CK_MOODS.map(w=>`<button class="ck-chip${_ckSel[group].includes(w)?' on':''}" onclick="ckMood('${group}','${w}')">${w}</button>`).join('');
   document.getElementById('ck-before').innerHTML=mk('before');
   document.getElementById('ck-after').innerHTML=mk('after');
   document.getElementById('ck-ctx').innerHTML=CK_CTX.map(([v,l])=>`<button class="ck-chip${_ckSel.ctx.includes(v)?' on':''}" onclick="ckCtx('${v}')">${l}</button>`).join('');
 }
-function ckMood(group,w){_ckSel[group]=_ckSel[group]===w?null:w;rCheckin();}
+function ckMood(group,w){const a=_ckSel[group];const i=a.indexOf(w);if(i>=0)a.splice(i,1);else a.push(w);rCheckin();}
 function ckCtx(v){const i=_ckSel.ctx.indexOf(v);if(i>=0)_ckSel.ctx.splice(i,1);else _ckSel.ctx.push(v);rCheckin();}
 function closeCheckin(){document.getElementById('checkin-ov').classList.remove('open');_ckDate=null;_ckIdx=null;}
 function skipCheckin(){closeCheckin();}
@@ -5584,12 +5584,12 @@ function saveCheckin(){
   try{
     const ti=document.getElementById('ck-time');
     const timeChanged=!!(ti&&ti.value&&ti.value!==_ckTime0);
-    if(_ckDate&&_ckIdx!==null&&(_ckSel.before||_ckSel.after||_ckSel.ctx.length||timeChanged)){
+    if(_ckDate&&_ckIdx!==null&&(_ckSel.before.length||_ckSel.after.length||_ckSel.ctx.length||timeChanged)){
       const log=JSON.parse(lsGet('fl_'+_ckDate,'[]'));
       const e=log[_ckIdx];
       if(e){
-        if(_ckSel.before)e.moodBefore=_ckSel.before;
-        if(_ckSel.after)e.moodAfter=_ckSel.after;
+        if(_ckSel.before.length)e.moodBefore=_ckSel.before.slice();
+        if(_ckSel.after.length)e.moodAfter=_ckSel.after.slice();
         if(_ckSel.ctx.length)e.eatCtx=_ckSel.ctx.slice();
         if(timeChanged){
           const d=new Date(_ckDate+'T'+ti.value);
