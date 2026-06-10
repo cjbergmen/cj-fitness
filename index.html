@@ -903,6 +903,7 @@ function fbSyncSettings(){
     try { const up=lsGet('_userProfile',''); if(up) settings.userProfile=JSON.parse(up); } catch(e){}
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
+    try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
     try { const gut=lsGet('_assess_gut_result',''); if(gut) settings.assessGut=JSON.parse(gut); } catch(e){}
     try { const aa=lsGet('_assess_aa_result',''); if(aa) settings.assessAa=JSON.parse(aa); } catch(e){}
@@ -977,6 +978,7 @@ async function fbPullAll(){
         if(s.userProfile) lsSet('_userProfile', JSON.stringify(s.userProfile));
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
+        if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
         if(s.assessGut) lsSet('_assess_gut_result', JSON.stringify(s.assessGut));
         if(s.assessAa) lsSet('_assess_aa_result', JSON.stringify(s.assessAa));
@@ -3277,6 +3279,169 @@ function rAssess(){
   return rAssessHub();
 }
 
+// ── PROGRESS DASHBOARD (rolling 30 days) ─────────────────────────────────────
+const PROG_DAYS=30;
+const CK_POS_MOODS=['Calm','Content','Energized'];
+const CK_GOOD_CTX=['relaxing','with_people','eating_slowly'];
+function _dkOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _trainDaySet(){
+  try{const cw=JSON.parse(lsGet('_customWorkouts','{}')||'{}');const ks=Object.keys(cw).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6);if(ks.length)return ks;}catch(e){}
+  return [1,2,4,5];
+}
+function _tgtFor(isT){
+  const custom=lsGet('_userTargets','');
+  if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isT?t.train:t.rest;}catch(e){}}
+  return isT?{p:150,c:200,f:65,k:2100,w:90}:{p:125,c:160,f:55,k:1750,w:75};
+}
+function computeProgress(){
+  const now=new Date(),td=_trainDaySet(),supps=getSupps();
+  let plannedWO=0,doneWO=0,daysLogged=0,protHit=0,waterSum=0,waterDays=0;
+  let moodPos=0,moodTot=0,ctxGood=0,ctxTot=0,checkins=0,improved=0,suppTaken=0,suppTotal=0;
+  for(let i=0;i<PROG_DAYS;i++){
+    const d=new Date(now);d.setDate(d.getDate()-i);
+    const key=_dkOf(d);
+    const isT=td.includes(d.getDay());
+    const tgt=_tgtFor(isT);
+    if(isT){plannedWO++;if(lsGet('wd_'+key,'0')==='1')doneWO++;}
+    let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))||[];}catch(e){}
+    if(log.length){
+      daysLogged++;
+      const pSum=log.reduce((a,e)=>a+(+e.p||0),0);
+      if(tgt.p&&pSum>=tgt.p*0.9)protHit++;
+      log.forEach(e=>{
+        const ma=Array.isArray(e.moodAfter)?e.moodAfter:(e.moodAfter?[e.moodAfter]:[]);
+        const mb=Array.isArray(e.moodBefore)?e.moodBefore:(e.moodBefore?[e.moodBefore]:[]);
+        const cx=e.eatCtx||[];
+        if(ma.length||mb.length||cx.length)checkins++;
+        if(ma.length){moodTot++;if(ma.some(w=>CK_POS_MOODS.includes(w)))moodPos++;}
+        if(mb.length&&ma.length&&!mb.some(w=>CK_POS_MOODS.includes(w))&&ma.some(w=>CK_POS_MOODS.includes(w)))improved++;
+        cx.forEach(c=>{ctxTot++;if(CK_GOOD_CTX.includes(c))ctxGood++;});
+      });
+    }
+    const w=parseFloat(lsGet('wa_'+key,'0'))||0;
+    if(w>0){waterDays++;waterSum+=Math.min(1,w/(tgt.w||90));}
+    if(supps.length){
+      let sl=[];try{sl=JSON.parse(lsGet('_supplog_'+key,'[]'))||[];}catch(e){}
+      let inst=0;supps.forEach(sp=>(sp.timing||[]).forEach(()=>inst++));
+      if(inst){suppTotal+=inst;suppTaken+=Math.min(sl.length,inst);}
+    }
+  }
+  const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
+  const gutR=_parseAssessResult(lsGet('_assess_gut_result',null));
+  const aaR=_parseAssessResult(lsGet('_assess_aa_result',null));
+  const assessDone=[nsR,gutR,aaR].filter(Boolean).length;
+  const cats=[
+    {id:'food',label:'Food',score:daysLogged?Math.round((daysLogged/PROG_DAYS)*50+(protHit/daysLogged)*50):null,
+     detail:daysLogged?daysLogged+'/'+PROG_DAYS+' days logged · protein goal hit '+protHit+' of those days':'No meals logged yet'},
+    {id:'water',label:'Hydration',score:waterDays?Math.round((waterDays/PROG_DAYS)*40+(waterSum/waterDays)*60):null,
+     detail:waterDays?waterDays+'/'+PROG_DAYS+' days tracked':'No water logged yet'},
+    {id:'mood',label:'Mood around meals',score:moodTot?Math.round(moodPos/moodTot*100):null,
+     detail:moodTot?moodPos+'/'+moodTot+' meals ended calm, content or energized'+(improved?' · '+improved+' lifted your mood':''):'No mood check-ins yet'},
+    {id:'ctx',label:'Eating conditions',score:ctxTot?Math.round(ctxGood/ctxTot*100):null,
+     detail:ctxTot?ctxGood+'/'+ctxTot+' were relaxed, social or unhurried':'No check-ins yet'},
+    {id:'workout',label:'Workouts',score:plannedWO?Math.round(doneWO/plannedWO*100):null,
+     detail:doneWO+'/'+plannedWO+' planned sessions completed'},
+    {id:'supps',label:'Supplements',score:supps.length?(suppTotal?Math.round(suppTaken/suppTotal*100):0):null,
+     detail:supps.length?suppTaken+'/'+suppTotal+' doses taken':'No supplements set up'},
+    {id:'assess',label:'Assessments',score:Math.round(assessDone/3*100),detail:assessDone+'/3 complete'}
+  ];
+  const scored=cats.filter(c=>c.score!==null);
+  const overall=scored.length?Math.round(scored.reduce((a,c)=>a+c.score,0)/scored.length):0;
+  const label=overall>=80?'Strong momentum':overall>=60?'On track':overall>=40?'Building momentum':'Just getting started';
+  return {overall,label,cats,stats:{doneWO,plannedWO,daysLogged,protHit,waterDays,moodPos,moodTot,improved,ctxGood,ctxTot,suppTaken,suppTotal,assessDone,checkins,
+    ns:nsR?{sympathetic:nsR.sympathetic,dorsal:nsR.dorsal,ventral:nsR.ventral,biological:nsR.biological}:null,
+    gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
+    aa:aaR?{types:aaR.types||aaR.scores||null}:null}};
+}
+function rProgressCard(){
+  const pr=computeProgress();
+  const col=v=>v>=70?'var(--green)':v>=40?'var(--orange)':'var(--red)';
+  return `<div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <div class="ct" style="padding:0;margin:0">Your Progress</div>
+      <div style="font-size:10px;color:var(--sub)">Last 30 days</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 12px">
+      <div style="font-size:36px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}</div>
+      <div style="font-size:14px;font-weight:700">${pr.label}</div>
+    </div>
+    ${pr.cats.map(c=>`<div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px">
+        <span style="font-weight:600">${c.label}</span><span style="color:var(--sub)">${c.score===null?'—':c.score}</span>
+      </div>
+      <div class="pw"><div class="pb" style="width:${c.score||0}%;background:${c.score===null?'var(--border)':col(c.score)}"></div></div>
+      <div style="font-size:10px;color:var(--sub);margin-top:2px">${c.detail}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── WEEKLY AI PROGRESS REVIEW ─────────────────────────────────────────────────
+let _aiWeeklyLoading=false,_aiWeeklyError=false,_aiWeeklyAutoTried=false;
+function getAIWeekly(){try{const v=lsGet('_aiWeekly','');return v?JSON.parse(v):null;}catch(e){return null;}}
+function maybeAutoWeekly(){
+  if(_aiWeeklyLoading||_aiWeeklyAutoTried)return;
+  const r=getAIWeekly();
+  if(r&&Date.now()-r.ts<7*86400000)return;
+  const pr=computeProgress();
+  if(!pr.stats.daysLogged&&!pr.stats.doneWO)return; // nothing to review yet
+  _aiWeeklyAutoTried=true;
+  runWeeklyReview();
+}
+async function runWeeklyReview(){
+  if(_aiWeeklyLoading)return;
+  _aiWeeklyLoading=true;_aiWeeklyError=false;
+  if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
+  try{
+    const pr=computeProgress();
+    let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
+    const st=pr.stats;
+    const prompt=`You are a trauma-informed functional health coach reviewing a client's last 30 days. Be warm, specific and encouraging — never shaming. Their goal: ${profile.goal||'general health'}. Stress level: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
+
+30-DAY DATA:
+- Overall progress score: ${pr.overall}/100 (${pr.label})
+${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data':c.score+'/100')+' ('+c.detail+')').join('\n')}
+- Meals that lifted mood (negative before, positive after): ${st.improved}
+- Nervous system assessment: ${st.ns?JSON.stringify(st.ns):'not taken'}
+- Gut assessment: ${st.gut?JSON.stringify(st.gut):'not taken'}
+- Amino acid assessment: ${st.aa?'taken':'not taken'}
+
+Respond ONLY with valid JSON, no markdown:
+{"statement":"2-3 warm sentences on their overall progress toward their goal, naming one genuine win and one honest growth area","suggestions":["3-5 specific, doable suggestions tied to the data"],"adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
+    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:900}})
+    });
+    const data=await res.json();
+    const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    const out=JSON.parse(clean);
+    if(out&&out.statement){
+      const rec={ts:Date.now(),statement:out.statement,suggestions:Array.isArray(out.suggestions)?out.suggestions:[],adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
+      lsSet('_aiWeekly',JSON.stringify(rec));
+      try{fbSyncSettings();}catch(e){}
+    }else{_aiWeeklyError=true;}
+  }catch(e){console.error('weekly review error',e);_aiWeeklyError=true;}
+  _aiWeeklyLoading=false;
+  if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
+}
+function rAIWeeklyCard(){
+  const r=getAIWeekly();
+  return `<div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="ct" style="padding:0;margin:0">✨ Weekly AI Review</div>
+      ${r?`<div style="font-size:10px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
+    </div>
+    ${_aiWeeklyLoading?`<div style="font-size:13px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
+      r?`<div style="font-size:13px;line-height:1.65;margin-bottom:10px">${r.statement}</div>
+      ${(r.suggestions||[]).map(sg=>`<div style="font-size:12px;line-height:1.5;padding:8px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px">💡 ${sg}</div>`).join('')}
+      ${r.adjustPlan?`<div style="font-size:12px;color:var(--orange);line-height:1.5;margin:8px 0">${r.adjustReason||'Based on your progress, a plan adjustment is recommended.'}</div>
+      <button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
+      `<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:10px">Once a week, AI reviews your food, mood, hydration, workouts, supplements and assessment results — then gives you a progress statement and personalized suggestions. It runs automatically, or you can run it anytime.</div>`}
+    ${_aiWeeklyError?`<div style="font-size:12px;color:var(--red);margin-bottom:8px">Couldn't reach the AI service — check your connection and try again.</div>`:''}
+    ${_aiWeeklyLoading?'':`<button class="btn btn-s btn-sm btn-f" onclick="runWeeklyReview()">${r?'↻ Run Review Now':'Run First Review'}</button>`}
+  </div>`;
+}
+
 function rAssessHub(){
   const nsResult = _parseAssessResult(lsGet('_assess_ns_result', null));
   const gutResult = _parseAssessResult(lsGet('_assess_gut_result', null));
@@ -3299,8 +3464,14 @@ function rAssessHub(){
   }
 
   const anyDone = nsResult || gutResult || aaResult;
+  const pairs=[[ASSESS_NS,nsResult],[ASSESS_GUT,gutResult],[ASSESS_AA,aaResult]];
+  const doneCards=pairs.filter(pr=>pr[1]).map(pr=>card(pr[0],pr[1])).join('');
+  const todoCards=pairs.filter(pr=>!pr[1]).map(pr=>card(pr[0],pr[1])).join('');
+  setTimeout(maybeAutoWeekly,400);
 
   return `<div style="padding:0 0 20px">
+    ${rProgressCard()}
+    ${rAIWeeklyCard()}
     ${anyDone ? `<div style="background:var(--surface);border:1px solid var(--green);border-radius:var(--r);padding:14px;margin-bottom:14px;cursor:pointer" onclick="_assessPage='insights';document.getElementById('page-assess').innerHTML=rAssess()">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
@@ -3310,12 +3481,11 @@ function rAssessHub(){
         <div style="font-size:20px;color:var(--green)">→</div>
       </div>
     </div>` : ''}
+    ${doneCards}
+    ${todoCards?`<div class="ct" style="padding:8px 3px 9px">Assessments to complete</div>
     <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:var(--rs);border:1px solid var(--border)">
       These assessments build your health profile. Your scores inform your AI recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.
-    </div>
-    ${card(ASSESS_NS, nsResult)}
-    ${card(ASSESS_GUT, gutResult)}
-    ${card(ASSESS_AA, aaResult)}
+    </div>${todoCards}`:''}
     <div class="card" style="margin-bottom:12px;opacity:0.7">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
         <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg></div>
