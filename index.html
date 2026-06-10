@@ -3285,7 +3285,10 @@ function rAssess(){
   return rAssessHub();
 }
 
-// ── PROGRESS DASHBOARD (rolling 30 days) ─────────────────────────────────────
+// ── PROGRESS DASHBOARD v2 (rolling 30 days, adherence + trend) ───────────────
+// Principles (behavior-change research): score consistency of behaviors the
+// user controls — not body outcomes. Missing one day dilutes, never zeroes.
+// Trend = last 15 days vs the 15 before. Weights follow the user's goal.
 const PROG_DAYS=30;
 const CK_POS_MOODS=['Calm','Content','Energized'];
 const CK_GOOD_CTX=['relaxing','with_people','eating_slowly'];
@@ -3299,134 +3302,213 @@ function _tgtFor(isT){
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isT?t.train:t.rest;}catch(e){}}
   return isT?{p:150,c:200,f:65,k:2100,w:90}:{p:125,c:160,f:55,k:1750,w:75};
 }
+// Gather one day's raw behavior facts
+function _dayFacts(d){
+  const key=_dkOf(d);
+  const isT=_trainDaySet().includes(d.getDay());
+  const tgt=_tgtFor(isT);
+  const f={planned:isT?1:0,woDone:(isT&&lsGet('wd_'+key,'0')==='1')?1:0,
+    logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
+    ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0};
+  let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))||[];}catch(e){}
+  if(log.length){
+    f.logged=1;
+    const pSum=log.reduce((a,e)=>a+(+e.p||0),0);
+    const kSum=log.reduce((a,e)=>a+(+e.k||0),0);
+    if(tgt.p&&pSum>=tgt.p*0.9)f.protHit=1;
+    if(tgt.k&&kSum>=tgt.k*0.75&&kSum<=tgt.k*1.2)f.calOk=1;
+    log.forEach(e=>{
+      const ma=Array.isArray(e.moodAfter)?e.moodAfter:(e.moodAfter?[e.moodAfter]:[]);
+      const mb=Array.isArray(e.moodBefore)?e.moodBefore:(e.moodBefore?[e.moodBefore]:[]);
+      if(ma.length){f.moodTot++;if(ma.some(w=>CK_POS_MOODS.includes(w)))f.moodReg++;}
+      if(ma.length&&mb.length){f.pairs++;if(!mb.some(w=>CK_POS_MOODS.includes(w))&&ma.some(w=>CK_POS_MOODS.includes(w)))f.improved++;}
+      (e.eatCtx||[]).forEach(c=>{f.ctxTot++;if(CK_GOOD_CTX.includes(c))f.ctxGood++;});
+    });
+  }
+  const w=parseFloat(lsGet('wa_'+key,'0'))||0;
+  if(w>0){f.waterTracked=1;if(w>=(tgt.w||90)*0.8)f.waterMet=1;}
+  const supps=getSupps();
+  if(supps.length){
+    let sl=[];try{sl=JSON.parse(lsGet('_supplog_'+key,'[]'))||[];}catch(e){}
+    let inst=0;supps.forEach(sp=>(sp.timing||[]).forEach(()=>inst++));
+    f.suppSched=inst;f.suppTaken=Math.min(sl.length,inst);
+  }
+  return f;
+}
+function _sumFacts(days){
+  const t={};
+  days.forEach(f=>Object.keys(f).forEach(k=>{t[k]=(t[k]||0)+f[k];}));
+  t.n=days.length;
+  return t;
+}
+// Each scorer: returns 0–100 or null when there is no data to judge
+const _PROG_SCORERS={
+  workout:t=>t.planned?Math.round(t.woDone/t.planned*100):null,
+  food:t=>{if(!t.logged)return null;
+    const consistency=t.logged/t.n, protein=t.protHit/t.logged, energy=t.calOk/t.logged;
+    return Math.round((consistency*0.4+protein*0.4+energy*0.2)*100);},
+  water:t=>t.waterTracked?Math.round(t.waterMet/t.waterTracked*100):null,
+  ctx:t=>t.ctxTot?Math.round(t.ctxGood/t.ctxTot*100):null,
+  mood:t=>{if(!t.moodTot)return null;
+    const reg=t.moodReg/t.moodTot;
+    return Math.round((t.pairs?reg*0.7+(t.improved/t.pairs)*0.3:reg)*100);},
+  supps:t=>t.suppSched?Math.round(t.suppTaken/t.suppSched*100):null,
+};
+const _PROG_WEIGHTS={
+  muscle:     {workout:.30,food:.25,water:.10,mood:.08,ctx:.07,supps:.10,assess:.10},
+  fat_loss:   {workout:.25,food:.30,water:.10,mood:.08,ctx:.10,supps:.07,assess:.10},
+  fitness:    {workout:.30,food:.22,water:.12,mood:.08,ctx:.08,supps:.10,assess:.10},
+  maintenance:{workout:.20,food:.20,water:.12,mood:.12,ctx:.12,supps:.12,assess:.12}
+};
+const GOAL_LABELS={muscle:'Build Muscle & Strength',fat_loss:'Lose Fat & Get Lean',fitness:'Fitness & Endurance',maintenance:'Maintain & Feel Great'};
 function computeProgress(){
-  const now=new Date(),td=_trainDaySet(),supps=getSupps();
-  let plannedWO=0,doneWO=0,daysLogged=0,protHit=0,waterSum=0,waterDays=0;
-  let moodPos=0,moodTot=0,ctxGood=0,ctxTot=0,checkins=0,improved=0,suppTaken=0,suppTotal=0;
+  const now=new Date();
+  const all=[],recent=[],prior=[];
   for(let i=0;i<PROG_DAYS;i++){
     const d=new Date(now);d.setDate(d.getDate()-i);
-    const key=_dkOf(d);
-    const isT=td.includes(d.getDay());
-    const tgt=_tgtFor(isT);
-    if(isT){plannedWO++;if(lsGet('wd_'+key,'0')==='1')doneWO++;}
-    let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))||[];}catch(e){}
-    if(log.length){
-      daysLogged++;
-      const pSum=log.reduce((a,e)=>a+(+e.p||0),0);
-      if(tgt.p&&pSum>=tgt.p*0.9)protHit++;
-      log.forEach(e=>{
-        const ma=Array.isArray(e.moodAfter)?e.moodAfter:(e.moodAfter?[e.moodAfter]:[]);
-        const mb=Array.isArray(e.moodBefore)?e.moodBefore:(e.moodBefore?[e.moodBefore]:[]);
-        const cx=e.eatCtx||[];
-        if(ma.length||mb.length||cx.length)checkins++;
-        if(ma.length){moodTot++;if(ma.some(w=>CK_POS_MOODS.includes(w)))moodPos++;}
-        if(mb.length&&ma.length&&!mb.some(w=>CK_POS_MOODS.includes(w))&&ma.some(w=>CK_POS_MOODS.includes(w)))improved++;
-        cx.forEach(c=>{ctxTot++;if(CK_GOOD_CTX.includes(c))ctxGood++;});
-      });
-    }
-    const w=parseFloat(lsGet('wa_'+key,'0'))||0;
-    if(w>0){waterDays++;waterSum+=Math.min(1,w/(tgt.w||90));}
-    if(supps.length){
-      let sl=[];try{sl=JSON.parse(lsGet('_supplog_'+key,'[]'))||[];}catch(e){}
-      let inst=0;supps.forEach(sp=>(sp.timing||[]).forEach(()=>inst++));
-      if(inst){suppTotal+=inst;suppTaken+=Math.min(sl.length,inst);}
-    }
+    const f=_dayFacts(d);
+    all.push(f);
+    (i<15?recent:prior).push(f);
   }
+  const tAll=_sumFacts(all),tRec=_sumFacts(recent),tPri=_sumFacts(prior);
   const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
   const gutR=_parseAssessResult(lsGet('_assess_gut_result',null));
   const aaR=_parseAssessResult(lsGet('_assess_aa_result',null));
   const assessDone=[nsR,gutR,aaR].filter(Boolean).length;
-  const cats=[
-    {id:'food',label:'Food',score:daysLogged?Math.round((daysLogged/PROG_DAYS)*50+(protHit/daysLogged)*50):null,
-     detail:daysLogged?daysLogged+'/'+PROG_DAYS+' days logged · protein goal hit '+protHit+' of those days':'No meals logged yet'},
-    {id:'water',label:'Hydration',score:waterDays?Math.round((waterDays/PROG_DAYS)*40+(waterSum/waterDays)*60):null,
-     detail:waterDays?waterDays+'/'+PROG_DAYS+' days tracked':'No water logged yet'},
-    {id:'mood',label:'Mood around meals',score:moodTot?Math.round(moodPos/moodTot*100):null,
-     detail:moodTot?moodPos+'/'+moodTot+' meals ended calm, content or energized'+(improved?' · '+improved+' lifted your mood':''):'No mood check-ins yet'},
-    {id:'ctx',label:'Eating conditions',score:ctxTot?Math.round(ctxGood/ctxTot*100):null,
-     detail:ctxTot?ctxGood+'/'+ctxTot+' were relaxed, social or unhurried':'No check-ins yet'},
-    {id:'workout',label:'Workouts',score:plannedWO?Math.round(doneWO/plannedWO*100):null,
-     detail:doneWO+'/'+plannedWO+' planned sessions completed'},
-    {id:'supps',label:'Supplements',score:supps.length?(suppTotal?Math.round(suppTaken/suppTotal*100):0):null,
-     detail:supps.length?suppTaken+'/'+suppTotal+' doses taken':'No supplements set up'},
-    {id:'assess',label:'Assessments',score:Math.round(assessDone/3*100),detail:assessDone+'/3 complete'}
+  let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
+  const goal=(profile.goal&&_PROG_WEIGHTS[profile.goal])?profile.goal:'maintenance';
+  const W=_PROG_WEIGHTS[goal];
+  const trendOf=(id)=>{
+    if(id==='assess')return 0;
+    const a=_PROG_SCORERS[id](tRec),b=_PROG_SCORERS[id](tPri);
+    if(a===null||b===null)return 0;
+    return a-b;
+  };
+  const defs=[
+    {id:'workout',label:'Workouts',what:'Planned sessions you completed',
+     detail:tAll.woDone+' of '+tAll.planned+' planned sessions in 30 days'},
+    {id:'food',label:'Nutrition',what:'Days logged (40%) + protein goal (40%) + calories in range (20%)',
+     detail:tAll.logged+'/'+PROG_DAYS+' days logged · protein goal '+tAll.protHit+' days · calories in range '+tAll.calOk+' days'},
+    {id:'water',label:'Hydration',what:'Tracked days where you hit 80%+ of your water goal',
+     detail:tAll.waterTracked?tAll.waterMet+' of '+tAll.waterTracked+' tracked days':'No water tracked yet'},
+    {id:'mood',label:'Mood signal',what:'Meals ending calm, content or energized — plus meals that lifted your mood',
+     detail:tAll.moodTot?tAll.moodReg+'/'+tAll.moodTot+' meals ended regulated'+(tAll.improved?' · '+tAll.improved+' lifted your mood':''):'No mood check-ins yet'},
+    {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried',
+     detail:tAll.ctxTot?tAll.ctxGood+' of '+tAll.ctxTot+' check-ins':'No check-ins yet'},
+    {id:'supps',label:'Supplements',what:'Scheduled doses you took',
+     detail:tAll.suppSched?tAll.suppTaken+' of '+tAll.suppSched+' doses':'No supplements set up'},
+    {id:'assess',label:'Assessments',what:'Health assessments completed (builds your profile)',
+     detail:assessDone+'/3 complete'}
   ];
+  const cats=defs.map(c=>{
+    const score=c.id==='assess'?Math.round(assessDone/3*100):_PROG_SCORERS[c.id](tAll);
+    const tr=trendOf(c.id);
+    return {...c,score,weight:W[c.id],trend:score===null?0:tr,arrow:score===null?'':(tr>=5?'↑':tr<=-5?'↓':'→')};
+  });
   const scored=cats.filter(c=>c.score!==null);
-  const overall=scored.length?Math.round(scored.reduce((a,c)=>a+c.score,0)/scored.length):0;
+  const wSum=scored.reduce((a,c)=>a+c.weight,0)||1;
+  const overall=Math.round(scored.reduce((a,c)=>a+c.score*c.weight,0)/wSum);
+  const oTrend=Math.round(scored.reduce((a,c)=>a+c.trend*c.weight,0)/wSum);
   const label=overall>=80?'Strong momentum':overall>=60?'On track':overall>=40?'Building momentum':'Just getting started';
-  return {overall,label,cats,stats:{doneWO,plannedWO,daysLogged,protHit,waterDays,moodPos,moodTot,improved,ctxGood,ctxTot,suppTaken,suppTotal,assessDone,checkins,
-    ns:nsR?{sympathetic:nsR.sympathetic,dorsal:nsR.dorsal,ventral:nsR.ventral,biological:nsR.biological}:null,
-    gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
-    aa:aaR?{types:aaR.types||aaR.scores||null}:null}};
+  const trendLabel=oTrend>=5?'trending up':oTrend<=-5?'dipping lately':'holding steady';
+  return {overall,label,oTrend,trendLabel,goal,goalLabel:GOAL_LABELS[goal],cats,
+    stats:{doneWO:tAll.woDone,plannedWO:tAll.planned,daysLogged:tAll.logged,protHit:tAll.protHit,calOk:tAll.calOk,
+      waterDays:tAll.waterTracked,waterMet:tAll.waterMet,moodPos:tAll.moodReg,moodTot:tAll.moodTot,improved:tAll.improved,
+      ctxGood:tAll.ctxGood,ctxTot:tAll.ctxTot,suppTaken:tAll.suppTaken,suppTotal:tAll.suppSched,assessDone,checkins:tAll.moodTot+tAll.ctxTot,
+      ns:nsR?{sympathetic:nsR.sympathetic,dorsal:nsR.dorsal,ventral:nsR.ventral,biological:nsR.biological}:null,
+      gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
+      aa:aaR?{taken:true}:null}};
 }
 function rProgressCard(){
   const pr=computeProgress();
   const col=v=>v>=70?'var(--green)':v>=40?'var(--orange)':'var(--red)';
+  const trCol=a=>a==='↑'?'var(--green)':a==='↓'?'var(--orange)':'var(--sub)';
   return `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
       <div class="ct" style="padding:0;margin:0">Your Progress</div>
       <div style="font-size:10px;color:var(--sub)">Last 30 days</div>
     </div>
-    <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 12px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 2px">
       <div style="font-size:36px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}</div>
-      <div style="font-size:14px;font-weight:700">${pr.label}</div>
-    </div>
-    ${pr.cats.map(c=>`<div style="margin-bottom:9px">
-      <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px">
-        <span style="font-weight:600">${c.label}</span><span style="color:var(--sub)">${c.score===null?'—':c.score}</span>
+      <div>
+        <div style="font-size:14px;font-weight:700">${pr.label} <span style="font-size:12px;font-weight:600;color:var(--sub)">· ${pr.trendLabel}</span></div>
+        <div style="font-size:10px;color:var(--sub)">Weighted for your goal: ${pr.goalLabel}</div>
       </div>
+    </div>
+    <div style="font-size:10.5px;color:var(--sub);line-height:1.45;margin:6px 0 12px">This measures your consistency — what you do, not your body. Arrows compare your last 15 days to the 15 before.</div>
+    ${pr.cats.map(c=>`<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;margin-bottom:1px">
+        <span style="font-weight:600">${c.label}</span>
+        <span><span style="color:${trCol(c.arrow)};font-weight:700">${c.arrow}</span> <span style="color:var(--sub)">${c.score===null?'—':c.score}</span></span>
+      </div>
+      <div style="font-size:10px;color:var(--sub);margin-bottom:3px">${c.what}</div>
       <div class="pw"><div class="pb" style="width:${c.score||0}%;background:${c.score===null?'var(--border)':col(c.score)}"></div></div>
       <div style="font-size:10px;color:var(--sub);margin-top:2px">${c.detail}</div>
     </div>`).join('')}
+    <details style="margin-top:4px">
+      <summary style="font-size:11px;color:var(--sub);cursor:pointer">How scoring works</summary>
+      <div style="font-size:11px;color:var(--sub);line-height:1.6;padding:8px 2px 0">
+        Every score is a simple ratio of <strong style="color:var(--text)">what you did ÷ what was planned</strong> over the last 30 days. Categories with no data show "—" and don't count against you. Missing a single day barely moves a score — research shows consistency over time builds habits, not perfection. Your overall number weights the categories that matter most for your goal (${pr.goalLabel}): ${pr.cats.filter(c=>c.score!==null).map(c=>c.label+' '+Math.round(c.weight*100)+'%').join(' · ')}.
+      </div>
+    </details>
   </div>`;
 }
 
 // ── WEEKLY AI PROGRESS REVIEW ─────────────────────────────────────────────────
-let _aiWeeklyLoading=false,_aiWeeklyError=false,_aiWeeklyAutoTried=false;
+let _aiWeeklyLoading=false,_aiWeeklyErrMsg='',_aiWeeklyAutoTried=false;
 function getAIWeekly(){try{const v=lsGet('_aiWeekly','');return v?JSON.parse(v):null;}catch(e){return null;}}
 function maybeAutoWeekly(){
   if(_aiWeeklyLoading||_aiWeeklyAutoTried)return;
   const r=getAIWeekly();
   if(r&&Date.now()-r.ts<7*86400000)return;
+  if(lsGet('_aiWeeklyTryDay','')===dk())return; // one auto attempt per day (protects free API quota)
   const pr=computeProgress();
-  if(!pr.stats.daysLogged&&!pr.stats.doneWO)return; // nothing to review yet
+  if(!pr.stats.daysLogged&&!pr.stats.doneWO)return;
   _aiWeeklyAutoTried=true;
+  lsSet('_aiWeeklyTryDay',dk());
   runWeeklyReview();
 }
 async function runWeeklyReview(){
   if(_aiWeeklyLoading)return;
-  _aiWeeklyLoading=true;_aiWeeklyError=false;
+  _aiWeeklyLoading=true;_aiWeeklyErrMsg='';
   if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
   try{
     const pr=computeProgress();
     let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
     const st=pr.stats;
-    const prompt=`You are a trauma-informed functional health coach reviewing a client's last 30 days. Be warm, specific and encouraging — never shaming. Their goal: ${profile.goal||'general health'}. Stress level: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
+    const prompt=`You are a trauma-informed functional health coach reviewing a client's last 30 days. Be warm, specific and encouraging — never shaming. Their goal: ${pr.goalLabel}. Stress level: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
 
-30-DAY DATA:
-- Overall progress score: ${pr.overall}/100 (${pr.label})
-${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data':c.score+'/100')+' ('+c.detail+')').join('\n')}
-- Meals that lifted mood (negative before, positive after): ${st.improved}
+30-DAY DATA (each category: score 0-100, trend = last 15 days vs prior 15):
+- Overall: ${pr.overall}/100 (${pr.label}, ${pr.trendLabel})
+${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, trend '+(c.trend>0?'+':'')+c.trend)+' ('+c.detail+')').join('\n')}
 - Nervous system assessment: ${st.ns?JSON.stringify(st.ns):'not taken'}
 - Gut assessment: ${st.gut?JSON.stringify(st.gut):'not taken'}
 - Amino acid assessment: ${st.aa?'taken':'not taken'}
 
 Respond ONLY with valid JSON, no markdown:
-{"statement":"2-3 warm sentences on their overall progress toward their goal, naming one genuine win and one honest growth area","suggestions":["3-5 specific, doable suggestions tied to the data"],"adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
-    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
+{"statement":"2-3 warm sentences on their progress toward their goal, naming one genuine win and one honest growth area","suggestions":["3-5 specific, doable suggestions tied to the data"],"adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
+    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash-lite`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:900}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})
     });
     const data=await res.json();
-    const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    const clean=raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-    const out=JSON.parse(clean);
-    if(out&&out.statement){
-      const rec={ts:Date.now(),statement:out.statement,suggestions:Array.isArray(out.suggestions)?out.suggestions:[],adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
-      lsSet('_aiWeekly',JSON.stringify(rec));
-      try{fbSyncSettings();}catch(e){}
-    }else{_aiWeeklyError=true;}
-  }catch(e){console.error('weekly review error',e);_aiWeeklyError=true;}
+    if(data&&data.error){
+      _aiWeeklyErrMsg=(data.error.code===429||data.error.status==='RESOURCE_EXHAUSTED')
+        ?'The AI service hit its daily free limit. Your review will run automatically tomorrow, or try again later.'
+        :'AI service error — please try again in a moment.';
+    }else{
+      const raw=data?.candidates?.[0]?.content?.parts?.map(pt=>pt.text||'').join('')||'';
+      const jm=raw.match(/\{[\s\S]*\}/);
+      const out=jm?JSON.parse(jm[0]):null;
+      if(out&&out.statement){
+        const rec={ts:Date.now(),statement:out.statement,suggestions:Array.isArray(out.suggestions)?out.suggestions:[],adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
+        lsSet('_aiWeekly',JSON.stringify(rec));
+        try{fbSyncSettings();}catch(e){}
+      }else{
+        _aiWeeklyErrMsg='The AI response came back incomplete — tap Run Review to try again.';
+      }
+    }
+  }catch(e){console.error('weekly review error',e);_aiWeeklyErrMsg='Couldn\'t reach the AI service — check your connection and try again.';}
   _aiWeeklyLoading=false;
   if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
 }
@@ -3443,7 +3525,7 @@ function rAIWeeklyCard(){
       ${r.adjustPlan?`<div style="font-size:12px;color:var(--orange);line-height:1.5;margin:8px 0">${r.adjustReason||'Based on your progress, a plan adjustment is recommended.'}</div>
       <button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
       `<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:10px">Once a week, AI reviews your food, mood, hydration, workouts, supplements and assessment results — then gives you a progress statement and personalized suggestions. It runs automatically, or you can run it anytime.</div>`}
-    ${_aiWeeklyError?`<div style="font-size:12px;color:var(--red);margin-bottom:8px">Couldn't reach the AI service — check your connection and try again.</div>`:''}
+    ${_aiWeeklyErrMsg?`<div style="font-size:12px;color:var(--red);line-height:1.5;margin-bottom:8px">${_aiWeeklyErrMsg}</div>`:''}
     ${_aiWeeklyLoading?'':`<button class="btn btn-s btn-sm btn-f" onclick="runWeeklyReview()">${r?'↻ Run Review Now':'Run First Review'}</button>`}
   </div>`;
 }
