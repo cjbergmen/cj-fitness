@@ -3455,36 +3455,57 @@ function computeProgress(){
       gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
       aa:aaR?{taken:true}:null}};
 }
+// Pick the single best growth opportunity for the week: biggest gap × goal weight,
+// preferring categories with enough history to judge (conf ≥ .5)
+function pickWeeklyFocus(pr){
+  const lines={
+    workout:'Get to every planned workout this week — even a short session counts.',
+    food:'Log your meals each day and aim for your protein goal.',
+    water:'Hit at least 80% of your water goal most days this week.',
+    mood:'Before you eat, pause for one slow breath — notice what shifts.',
+    ctx:'Slow down for one meal a day — sit, relax, no rushing.',
+    supps:'Take your supplements as scheduled — tie them to a daily habit.',
+    assess:'Finish your remaining assessments — about 5 minutes each.'
+  };
+  const cands=pr.cats.filter(c=>c.score!==null);
+  if(!cands.length||(cands.length===1&&cands[0].id==='assess'&&cands[0].score===0))return {label:'Get started',line:'Log a meal or a workout today — your story starts with one entry.'};
+  let pool=cands.filter(c=>c.conf>=0.5);
+  if(!pool.length)pool=cands;
+  if(pool.every(c=>c.score>=85))return {label:'Keep it rolling',line:'Everything is on track — protect your routine this week.'};
+  const f=pool.reduce((a,c)=>((100-c.score)*c.weight>(100-a.score)*a.weight?c:a));
+  return {label:f.label,line:lines[f.id]||''};
+}
 function rProgressCard(){
   const pr=computeProgress();
+  const focus=pickWeeklyFocus(pr);
   const col=v=>v>=70?'var(--green)':v>=40?'var(--orange)':'var(--red)';
   const trCol=a=>a==='↑'?'var(--green)':a==='↓'?'var(--orange)':'var(--sub)';
   return `<div class="card" style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
       <div class="ct" style="padding:0;margin:0">Your Progress</div>
-      <div style="font-size:10px;color:var(--sub)">Last 30 days</div>
+      <div style="font-size:11px;color:var(--sub)">Last 30 days</div>
     </div>
-    <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 2px">
-      <div style="font-size:36px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}<span style="font-size:15px;font-weight:700;color:var(--sub)">/100</span></div>
-      <div>
-        <div style="font-size:14px;font-weight:700">${pr.label} <span style="font-size:12px;font-weight:600;color:var(--sub)">· ${pr.trendLabel}</span></div>
-        <div style="font-size:10px;color:var(--sub)">Weighted for your goal: ${pr.goalLabel}</div>
-      </div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:10px 0 14px">
+      <div style="font-size:44px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}<span style="font-size:17px;font-weight:700;color:var(--sub)">/100</span></div>
+      <div style="font-size:15px;font-weight:700">${pr.label}<div style="font-size:12px;font-weight:600;color:var(--sub)">${pr.trendLabel}</div></div>
     </div>
-    <div style="font-size:10.5px;color:var(--sub);line-height:1.45;margin:6px 0 12px">This measures your consistency — what you do, not your body. Each category only counts days since you started using that feature.</div>
-    ${pr.cats.map(c=>`<div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;margin-bottom:1px">
+    <div style="background:var(--surface2);border-left:3px solid var(--green);border-radius:var(--rs);padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:4px">🎯 This week's focus</div>
+      <div style="font-size:17px;font-weight:800;margin-bottom:4px">${focus.label}</div>
+      <div style="font-size:13.5px;line-height:1.5">${focus.line}</div>
+    </div>
+    ${pr.cats.map(c=>`<div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:3px">
         <span style="font-weight:600">${c.label}</span>
-        <span><span style="color:${trCol(c.arrow)};font-weight:700">${c.arrow}</span> <span style="color:var(--sub)">${c.score===null?'—':c.score}</span></span>
+        <span><span style="color:${trCol(c.arrow)};font-weight:700">${c.arrow}</span> <span style="font-weight:700;color:${c.score===null?'var(--sub)':'var(--text)'}">${c.score===null?'—':c.score}</span></span>
       </div>
-      <div style="font-size:10px;color:var(--sub);margin-bottom:3px">${c.what}</div>
       <div class="pw"><div class="pb" style="width:${c.score||0}%;background:${c.score===null?'var(--border)':col(c.score)}"></div></div>
-      <div style="font-size:10px;color:var(--sub);margin-top:2px">${c.detail}</div>
     </div>`).join('')}
-    <details style="margin-top:4px">
-      <summary style="font-size:11px;color:var(--sub);cursor:pointer">How scoring works</summary>
-      <div style="font-size:11px;color:var(--sub);line-height:1.6;padding:8px 2px 0">
-        Every score (out of 100) is a simple ratio of <strong style="color:var(--text)">what you did ÷ what was planned</strong>. Each category only counts the days since you first used that feature — new features start fresh instead of counting old empty days, and categories with under two weeks of history count less toward your overall while they ramp up. Categories with no data show "—" and don't count against you. Missing a single day barely moves a score — research shows consistency over time builds habits, not perfection. Trend arrows compare the two halves of each category's own history (shown once it has 10+ days). Your overall weights the categories that matter most for your goal (${pr.goalLabel}): ${pr.cats.filter(c=>c.score!==null).map(c=>c.label+' '+Math.round(c.weight*100)+'%').join(' · ')}.
+    <details style="margin-top:6px">
+      <summary style="font-size:12px;color:var(--sub);cursor:pointer">Details &amp; how scoring works</summary>
+      <div style="font-size:12px;color:var(--sub);line-height:1.6;padding:8px 2px 0">
+        ${pr.cats.map(c=>`<div style="margin-bottom:7px"><strong style="color:var(--text)">${c.label}</strong> — ${c.what}.<br>${c.detail}</div>`).join('')}
+        <div style="margin-top:8px">Every score is what you did ÷ what was planned, counting only days since you first used that feature. Categories with under two weeks of history count less toward your overall. Weighted for ${pr.goalLabel}: ${pr.cats.filter(c=>c.score!==null).map(c=>c.label+' '+Math.round(c.weight*100)+'%').join(' · ')}.</div>
       </div>
     </details>
   </div>`;
@@ -3553,14 +3574,16 @@ function rAIWeeklyCard(){
   return `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="ct" style="padding:0;margin:0">✨ Weekly AI Review</div>
-      ${r?`<div style="font-size:10px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
+      ${r?`<div style="font-size:11px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
     </div>
-    ${_aiWeeklyLoading?`<div style="font-size:13px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
-      r?`<div style="font-size:13px;line-height:1.65;margin-bottom:10px">${r.statement}</div>
-      ${(r.suggestions||[]).map(sg=>`<div style="font-size:12px;line-height:1.5;padding:8px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px">💡 ${sg}</div>`).join('')}
-      ${r.adjustPlan?`<div style="font-size:12px;color:var(--orange);line-height:1.5;margin:8px 0">${r.adjustReason||'Based on your progress, a plan adjustment is recommended.'}</div>
-      <button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
-      `<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:10px">Once a week, AI reviews your food, mood, hydration, workouts, supplements and assessment results — then gives you a progress statement and personalized suggestions. It runs automatically, or you can run it anytime.</div>`}
+    ${_aiWeeklyLoading?`<div style="font-size:14px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
+      r?`<div style="font-size:14px;line-height:1.6;margin-bottom:8px">${r.statement}</div>
+      ${(r.suggestions||[]).length?`<details style="margin-bottom:8px">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer">Suggestions (${r.suggestions.length})</summary>
+        <div style="padding-top:6px">${r.suggestions.map(sg=>`<div style="font-size:13px;line-height:1.5;padding:8px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px">💡 ${sg}</div>`).join('')}</div>
+      </details>`:''}
+      ${r.adjustPlan?`<button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
+      `<div style="font-size:14px;color:var(--sub);line-height:1.5;margin-bottom:10px">Runs weekly on your last 30 days — a short progress statement plus suggestions.</div>`}
     ${_aiWeeklyErrMsg?`<div style="font-size:12px;color:var(--red);line-height:1.5;margin-bottom:8px">${_aiWeeklyErrMsg}</div>`:''}
     ${_aiWeeklyLoading?'':`<button class="btn btn-s btn-sm btn-f" onclick="runWeeklyReview()">${r?'↻ Run Review Now':'Run First Review'}</button>`}
   </div>`;
