@@ -277,6 +277,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .signin-google-btn:active{opacity:.8}
 .signin-footer{font-size:11px;color:var(--sub);margin-top:20px;opacity:.7}
 
+/* ── MEAL CHECK-IN ────────────────────────────────────────── */
+.ck-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px}
+.ck-chip{padding:7px 13px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--sub);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font-sans);transition:all .15s}
+.ck-chip.on{border-color:var(--green);background:var(--green);color:#fff}
+
 /* ── ONBOARDING WIZARD ─────────────────────────────────────────────── */
 .wiz-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;overflow-y:auto;opacity:0;transition:opacity .3s;pointer-events:none}
 .wiz-overlay.open{opacity:1;pointer-events:all}
@@ -519,6 +524,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div style="display:flex;gap:9px">
       <button class="btn btn-s" style="flex:1" onclick="closeGram()">Cancel</button>
       <button class="btn btn-g" style="flex:2" onclick="logGrams()">Log It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Meal Check-in Modal -->
+<div class="ov" id="checkin-ov">
+  <div class="modal">
+    <div class="mh"></div>
+    <div class="mt2" id="ck-title">How was this meal?</div>
+    <div style="font-size:12px;color:var(--sub);margin:-10px 0 14px">Optional — a few seconds now builds your metastory over time.</div>
+    <div class="fg"><label class="fl">Mood before eating</label><div id="ck-before" class="ck-chips"></div></div>
+    <div class="fg"><label class="fl">Mood after eating</label><div id="ck-after" class="ck-chips"></div></div>
+    <div class="fg"><label class="fl">While eating, I was…</label><div id="ck-ctx" class="ck-chips"></div></div>
+    <div style="display:flex;gap:9px;margin-top:6px">
+      <button class="btn btn-s" style="flex:1" onclick="skipCheckin()">Skip</button>
+      <button class="btn btn-g" style="flex:2" onclick="saveCheckin()">Save</button>
     </div>
   </div>
 </div>
@@ -4039,8 +4060,8 @@ function fmlLogGrams(sid){
   const log=getLog();
   log.push({name:it.n,emoji:it.e||'🍽️',
     p:Math.round(it.p*s*10)/10,c:Math.round(it.c*s*10)/10,f:Math.round(it.f*s*10)/10,k:Math.round(it.k*s),
-    t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
-  putLog(log);closeFood();rFood();if(curPage==='today')rToday();
+    ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+  putLog(log);closeFood();rFood();if(curPage==='today')rToday();setTimeout(openMealCheckin,350);
   const toast=document.createElement('div');
   toast.textContent=`✅ ${it.n} logged (${g}g)`;
   toast.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;white-space:nowrap';
@@ -4051,8 +4072,8 @@ function fmlLogDirect(sid){
   if(!it)return;
   const log=getLog();
   log.push({name:it.n,emoji:it.e||'🍽️',p:it.p,c:it.c,f:it.f,k:it.k,
-    t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
-  putLog(log);closeFood();rFood();if(curPage==='today')rToday();
+    ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+  putLog(log);closeFood();rFood();if(curPage==='today')rToday();setTimeout(openMealCheckin,350);
 }
 
 // ── QM Ingredient Override System ────────────────────────────────────────
@@ -4321,10 +4342,11 @@ function logSuggestion(id){
   const log=getLog();
   const now=new Date();
   log.push({name:item.n,emoji:item.e||'🍽️',cat:item.cat||'custom',p:item.p,c:item.c,f:item.f,k:item.k,
-    time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),added:Date.now()});
+    ts:Date.now(),time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),added:Date.now()});
   putLog(log);
   _showSuggest=false;
   rFood();
+  setTimeout(openMealCheckin,350);
 }
 
 function rFoodLibHTML(){
@@ -4508,13 +4530,14 @@ function libLogGrams(id){
   const log=getLog();
   log.push({name,emoji:item.e||'🥩',
     p:Math.round(item.p*s*10)/10,c:Math.round(item.c*s*10)/10,f:Math.round(item.f*s*10)/10,k:Math.round(item.k*s),
-    t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+    ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
   putLog(log);
   delete _libGrams[id];
   _libExpandedId=null;
   _foodTab='log';
   rFood();
   if(curPage==='today')rToday();
+  setTimeout(openMealCheckin,350);
 }
 
 function libTogglePerGram(id){
@@ -4569,7 +4592,7 @@ function libLogScaledGrams(id){
   const log=getLog();
   log.push({name,emoji:item.e||'🍽️',
     p:Math.round(base.p*s*10)/10,c:Math.round(base.c*s*10)/10,f:Math.round(base.f*s*10)/10,k:Math.round(base.k*s),
-    time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+    ts:Date.now(),time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
   if(!putLog(log)){showToast('Storage full — couldn\'t save');return;}
   delete _libGrams[id];
   _libExpandedId=null;
@@ -4577,6 +4600,7 @@ function libLogScaledGrams(id){
   rFood();
   if(curPage==='today')rToday();
   showToast(name+' logged ✅');
+  setTimeout(openMealCheckin,350);
 }
 
 
@@ -4591,12 +4615,13 @@ function libLogIt(id){
   const log=getLog();
   log.push({name,emoji:item.e||'🍽️',
     p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),
-    t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+    ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
   putLog(log);
   _libExpandedId=null;
   _foodTab='log';
   rFood();
   if(curPage==='today')rToday();
+  setTimeout(openMealCheckin,350);
 }
 
 function libSave(id){
@@ -4807,8 +4832,8 @@ function quickLibAdd(sid){
     // Log directly
     const log=getLog();
     log.push({name:it.n,emoji:it.e||'🍽️',p:it.p,c:it.c,f:it.f,k:it.k,
-      t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
-    putLog(log);closeFood();rFood();if(curPage==='today')rToday();
+      ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+    putLog(log);closeFood();rFood();if(curPage==='today')rToday();setTimeout(openMealCheckin,350);
   }
 }
 function quickReLog(jsonStr){
@@ -4817,8 +4842,8 @@ function quickReLog(jsonStr){
     const log=getLog();
     log.push({name:e.name||e.n,emoji:e.emoji||e.e||'🍽️',
       p:e.p||0,c:e.c||0,f:e.f||0,k:e.k||0,
-      t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
-    putLog(log);closeFood();rFood();if(curPage==='today')rToday();
+      ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+    putLog(log);closeFood();rFood();if(curPage==='today')rToday();setTimeout(openMealCheckin,350);
   }catch(err){}
 }
 function setQCat(cat,btn){
@@ -4857,20 +4882,21 @@ function quickAdd(i){
   }
   // One-tap log — no form needed
   const log=getLog();
-  log.push({name:m.n,emoji:m.e,p:m.p,c:m.c,f:m.f,k:m.k,t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
+  log.push({name:m.n,emoji:m.e,p:m.p,c:m.c,f:m.f,k:m.k,ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
   putLog(log);
   // Save/update in personal library
   const _ing=_getQMIng(QM[i]);
   saveToLib({n:m.n,e:m.e,cat:m.cat,p:m.p,c:m.c,f:m.f,k:m.k,ing:_ing,source:'qm'});
   closeFood();rFood();
   if(curPage==='today')rToday();
+  setTimeout(openMealCheckin,350);
 }
 function closeGram(){document.getElementById('gram-ov').classList.remove('open');_gramItem=null;}
 function logGrams(){
   const grams=parseFloat(document.getElementById('gram-input').value);
   if(!grams||grams<=0){alert('Enter a weight in grams');return;}
   const m=_gramItem,s=grams/100;
-  const entry={name:m.n,emoji:m.e,p:Math.round(m.p*s*10)/10,c:Math.round(m.c*s*10)/10,f:Math.round(m.f*s*10)/10,k:Math.round(m.k*s),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  const entry={name:m.n,emoji:m.e,p:Math.round(m.p*s*10)/10,c:Math.round(m.c*s*10)/10,f:Math.round(m.f*s*10)/10,k:Math.round(m.k*s),ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
   const log=getLog();
   log.push(entry);
   putLog(log);
@@ -4881,6 +4907,7 @@ function logGrams(){
   }
   closeGram();closeFood();rFood();
   if(curPage==='today')rToday();
+  setTimeout(openMealCheckin,350);
 }
 
 function onPhoto(input){
@@ -5492,7 +5519,7 @@ async function saveFood(){
     const _qmMatch=QM.find(x=>x.n.toLowerCase()===name.toLowerCase());
     const _logCat=(_libMatch&&_libMatch.cat)||(_qmMatch&&_qmMatch.cat)||guessFoodCat(name,now.getHours());
     log.push({name,emoji:curEmoji||'🍽️',cat:_logCat,
-      time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),p,c,f,k});
+      ts:Date.now(),time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),p,c,f,k});
     if(!putLog(log)){
       const st=document.getElementById('ai-scan-status');
       if(st){st.style.display='block';st.textContent='❌ Storage full — delete some old days and try again.';}
@@ -5504,6 +5531,7 @@ async function saveFood(){
     rFood();
     if(curPage==='today')rToday();
     showToast(name+' logged ✅');
+    setTimeout(openMealCheckin,350);
   } catch(e) {
     console.error('saveFood error',e);
     const st=document.getElementById('ai-scan-status');
@@ -5514,6 +5542,53 @@ async function saveFood(){
 function delFood(i){
   const log=getLog();log.splice(i,1);putLog(log);rFood();
   if(curPage==='today')rToday();
+}
+
+// ── MEAL CHECK-IN (mood + eating context) ─────────────────────────────────
+const CK_MOODS=['Calm','Content','Energized','Tired','Stressed','Anxious','Bored','Irritable','Sad','Numb'];
+const CK_CTX=[['relaxing','🛋️ Relaxing'],['with_people','👥 With people'],['eating_slowly','🐢 Eating slowly'],['in_a_rush','⏱️ In a rush'],['on_the_go','🚗 On the go'],['getting_it_down','😮‍💨 Just getting it down']];
+let _ckSel={before:null,after:null,ctx:[]};
+let _ckDate=null,_ckIdx=null;
+
+function openMealCheckin(){
+  try{
+    const log=getLog();
+    if(!log.length)return;
+    _ckDate=viewDate;_ckIdx=log.length-1;
+    _ckSel={before:null,after:null,ctx:[]};
+    const e=log[_ckIdx];
+    const t=document.getElementById('ck-title');
+    if(t)t.textContent=(e.emoji||'🍽️')+' '+(e.name||'This meal');
+    rCheckin();
+    document.getElementById('checkin-ov').classList.add('open');
+  }catch(err){console.error('checkin open error',err);}
+}
+function rCheckin(){
+  const mk=(group)=>CK_MOODS.map(w=>`<button class="ck-chip${_ckSel[group]===w?' on':''}" onclick="ckMood('${group}','${w}')">${w}</button>`).join('');
+  document.getElementById('ck-before').innerHTML=mk('before');
+  document.getElementById('ck-after').innerHTML=mk('after');
+  document.getElementById('ck-ctx').innerHTML=CK_CTX.map(([v,l])=>`<button class="ck-chip${_ckSel.ctx.includes(v)?' on':''}" onclick="ckCtx('${v}')">${l}</button>`).join('');
+}
+function ckMood(group,w){_ckSel[group]=_ckSel[group]===w?null:w;rCheckin();}
+function ckCtx(v){const i=_ckSel.ctx.indexOf(v);if(i>=0)_ckSel.ctx.splice(i,1);else _ckSel.ctx.push(v);rCheckin();}
+function closeCheckin(){document.getElementById('checkin-ov').classList.remove('open');_ckDate=null;_ckIdx=null;}
+function skipCheckin(){closeCheckin();}
+function saveCheckin(){
+  try{
+    if(_ckDate&&_ckIdx!==null&&(_ckSel.before||_ckSel.after||_ckSel.ctx.length)){
+      const log=JSON.parse(lsGet('fl_'+_ckDate,'[]'));
+      const e=log[_ckIdx];
+      if(e){
+        if(_ckSel.before)e.moodBefore=_ckSel.before;
+        if(_ckSel.after)e.moodAfter=_ckSel.after;
+        if(_ckSel.ctx.length)e.eatCtx=_ckSel.ctx.slice();
+        e.checkinAt=Date.now();
+        lsSet('fl_'+_ckDate,JSON.stringify(log));
+        try{fbSyncFoodLog(_ckDate,log);}catch(err){}
+      }
+    }
+  }catch(err){console.error('checkin save error',err);}
+  closeCheckin();
 }
 
 // ── WATER ACTIONS ─────────────────────────────────────────────────────────────
@@ -5785,7 +5860,7 @@ function cardTimerClick(idx,initSec){
 }
 
 // ── MODAL CLOSE ON OVERLAY TAP ────────────────────────────────────────────────
-['food-ov','water-ov','timer-ov','usr-ov','key-ov','settings-ov','recipe-ov'].forEach(id=>{
+['food-ov','water-ov','timer-ov','usr-ov','key-ov','settings-ov','recipe-ov','checkin-ov'].forEach(id=>{
   const el=document.getElementById(id);
   if(!el)return;
   el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});
@@ -5827,6 +5902,7 @@ function addSwipeToDismiss(ovId,closeFn){
 }
 addSwipeToDismiss('food-ov',closeFood);
 addSwipeToDismiss('water-ov',()=>document.getElementById('water-ov').classList.remove('open'));
+addSwipeToDismiss('checkin-ov',closeCheckin);
 addSwipeToDismiss('recipe-ov',closeRecipeImport);
 addSwipeToDismiss('settings-ov',closeSettings);
 addSwipeToDismiss('supp-ov',closeSuppModal);
@@ -6472,6 +6548,8 @@ const WIZ_STEPS=[
   {type:'loading'},
   // 10: Done
   {type:'done'},
+  // Final: offer health assessments (skippable)
+  {type:'assess'},
 ];
 
 function renderWiz(){
@@ -6479,11 +6557,11 @@ function renderWiz(){
   if(!el)return;
   const s=WIZ_STEPS[_wiz.step];
   // Count visible steps for progress bar
-  const visibleSteps=WIZ_STEPS.filter((_,i)=>!_wizShouldSkip(i)&&_.type!=='loading'&&_.type!=='done');
+  const visibleSteps=WIZ_STEPS.filter((_,i)=>!_wizShouldSkip(i)&&_.type!=='loading'&&_.type!=='done'&&_.type!=='assess');
   const visibleIdx=visibleSteps.indexOf(s);
   const pct=visibleIdx<=0?0:Math.min(100,Math.round((visibleIdx/(visibleSteps.length-1))*100));
   
-  if(s.type==='loading'||s.type==='done'){
+  if(s.type==='loading'||s.type==='done'||s.type==='assess'){
     el.innerHTML=renderWizStep(s);
     return;
   }
@@ -6667,6 +6745,9 @@ function renderWizStep(s){
     const goals=Array.isArray(p.style)?p.style:[];
     const isRebuild=_wiz.rebuilding;
     const prog=_wiz.progress||{};
+    const _offerAssess=!isRebuild&&!_assessAllDone();
+    const _doneBtnFn=_offerAssess?'wizGoAssess()':'wizFinish()';
+    const _doneBtnLabel=isRebuild?'Start New Phase':(_offerAssess?'Continue':'Start Training');
     return `<div style="display:flex;flex-direction:column;align-items:center;padding:20px 0 10px">
       <div class="wiz-title">${isRebuild?'Your updated plan is ready!':'Your plan is ready!'}</div>
       <div class="wiz-sub">${isRebuild?(prog.totalCompleted>0?prog.totalCompleted+' workouts in the books. Here\'s your next phase.':'Here\'s your updated plan.'):'Here\'s your personalized plan.'}</div>
@@ -6683,7 +6764,27 @@ function renderWizStep(s){
         ${foods?`<div class="wiz-done-card"><div class="wiz-done-card-title">${foods} foods added to your library</div>
           ${(plan.foodSuggestions||[]).slice(0,6).map(f=>`<span class="wiz-done-badge">${f.e||''} ${f.n}</span>`).join('')}</div>`:''}
       </div>
-      <button class="wiz-next-btn" style="margin-top:16px;width:100%" onclick="wizFinish()">${isRebuild?'Start New Phase':'Start Training'}</button>
+      <button class="wiz-next-btn" style="margin-top:16px;width:100%" onclick="${_doneBtnFn}">${_doneBtnLabel}</button>
+    </div>`;
+  }
+  if(s.type==='assess'){
+    const cards=[
+      {em:'🧠',t:'Nervous System Assessment',d:'Identify your nervous system pattern — activation, shutdown, or regulation — based on the last 7 days.'},
+      {em:'🦠',t:'Gut Health Assessment',d:'Evaluate gut-brain markers: inflammation, leaky gut, sleep, and mood connections.'},
+      {em:'🧬',t:'Amino Acid Assessment',d:'Spot neurotransmitter imbalances affecting mood, energy, stress, and cravings.'},
+    ];
+    return `<div style="display:flex;flex-direction:column;align-items:center;padding:20px 0 10px">
+      <div class="wiz-title">Build your health profile</div>
+      <div class="wiz-sub">Three short assessments personalize your AI recommendations, recovery plan, and practitioner reports — about 3–5 minutes each. You can also take them anytime from the Assessments tab.</div>
+      <div style="width:100%">
+        ${cards.map(c=>`<div class="wiz-done-card" style="display:flex;gap:12px;align-items:flex-start">
+          <div style="font-size:26px;line-height:1">${c.em}</div>
+          <div><div class="wiz-done-card-title" style="margin-bottom:2px">${c.t}</div>
+          <div style="font-size:12px;color:var(--sub);line-height:1.5">${c.d}</div></div>
+        </div>`).join('')}
+      </div>
+      <button class="wiz-next-btn" style="margin-top:16px;width:100%" onclick="wizStartAssess()">Take Assessments Now</button>
+      <button onclick="wizFinish()" style="margin-top:12px;background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px">I'll do these later</button>
     </div>`;
   }
   return '';
@@ -7493,6 +7594,22 @@ function wizFinish(){
   refresh();
 }
 
+function _assessAllDone(){
+  return !!(lsGet('_assess_ns_result','')&&lsGet('_assess_gut_result','')&&lsGet('_assess_aa_result',''));
+}
+function wizGoAssess(){
+  _wiz.step=WIZ_STEPS.findIndex(x=>x.type==='assess');
+  renderWiz();
+  document.getElementById('wiz-overlay')?.scrollTo({top:0,behavior:'smooth'});
+}
+function wizStartAssess(){
+  wizApply();
+  closeWizard();
+  refresh();
+  goPage('assess');
+  startAssess('ns');
+}
+
 // ── Smart Meal Builder ────────────────────────────────────────────────────
 let _mealMode='single',_mealComps=[],_pickCompIdx=null;
 
@@ -7604,7 +7721,7 @@ async function logMealBuilder(){
   let log=[];
   try{log=JSON.parse(lsGet('fl_'+today,'[]'))||[];}catch(e){}
   // No photo stored on the entry — emoji only, like the rest of the log.
-  log.push({name,emoji:'🥗',p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),comps:_mealComps.map(c=>({n:c.name,e:c.emoji,g:c.grams,p:Math.round(c.pTotal*10)/10,c:Math.round(c.cTotal*10)/10,f:Math.round(c.fTotal*10)/10,k:Math.round(c.kTotal)}))});
+  log.push({name,emoji:'🥗',p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),ts:Date.now(),time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),comps:_mealComps.map(c=>({n:c.name,e:c.emoji,g:c.grams,p:Math.round(c.pTotal*10)/10,c:Math.round(c.cTotal*10)/10,f:Math.round(c.fTotal*10)/10,k:Math.round(c.kTotal)}))});
   let ok=true;
   try{localStorage.setItem('fl_'+today,JSON.stringify(log));}catch(e){ok=false;MEM['fl_'+today]=JSON.stringify(log);}
   if(!ok){
@@ -7620,6 +7737,7 @@ async function logMealBuilder(){
   closeFood();rFood();
   if(curPage==='today')rToday();
   showToast(name+' logged ✅');
+  setTimeout(openMealCheckin,350);
 }
 
 // ── Gemini Key Management ─────────────────────────────────────────────────
