@@ -3285,10 +3285,12 @@ function rAssess(){
   return rAssessHub();
 }
 
-// ── PROGRESS DASHBOARD v2 (rolling 30 days, adherence + trend) ───────────────
-// Principles (behavior-change research): score consistency of behaviors the
-// user controls — not body outcomes. Missing one day dilutes, never zeroes.
-// Trend = last 15 days vs the 15 before. Weights follow the user's goal.
+// ── PROGRESS DASHBOARD v3 (adherence + trend + feature-availability windows) ──
+// Principles: score behaviors the user controls, as done÷planned ratios.
+// A category only counts days since the user FIRST used that feature, so new
+// features never drag scores down. Categories with <14 days of history get a
+// reduced weight in the overall while they ramp up. Workout completion is
+// lenient (matches the rest of the app): "Mark Complete" flag OR logged sets.
 const PROG_DAYS=30;
 const CK_POS_MOODS=['Calm','Content','Energized'];
 const CK_GOOD_CTX=['relaxing','with_people','eating_slowly'];
@@ -3302,14 +3304,15 @@ function _tgtFor(isT){
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isT?t.train:t.rest;}catch(e){}}
   return isT?{p:150,c:200,f:65,k:2100,w:90}:{p:125,c:160,f:55,k:1750,w:75};
 }
-// Gather one day's raw behavior facts
 function _dayFacts(d){
   const key=_dkOf(d);
   const isT=_trainDaySet().includes(d.getDay());
   const tgt=_tgtFor(isT);
-  const f={planned:isT?1:0,woDone:(isT&&lsGet('wd_'+key,'0')==='1')?1:0,
-    logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
-    ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0};
+  const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
+    ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0};
+  // Workout done = "Mark Complete" flag OR any logged sets (lenient, matches week heatmap)
+  if(lsGet('wd_'+key,'0')==='1')f.woAny=1;
+  else{try{const wl=JSON.parse(lsGet('wl_'+key,'[]'));if(Array.isArray(wl)&&wl.length>0)f.woAny=1;}catch(e){}}
   let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))||[];}catch(e){}
   if(log.length){
     f.logged=1;
@@ -3320,9 +3323,11 @@ function _dayFacts(d){
     log.forEach(e=>{
       const ma=Array.isArray(e.moodAfter)?e.moodAfter:(e.moodAfter?[e.moodAfter]:[]);
       const mb=Array.isArray(e.moodBefore)?e.moodBefore:(e.moodBefore?[e.moodBefore]:[]);
+      const cx=e.eatCtx||[];
+      if(ma.length||mb.length||cx.length)f.ckAny=1;
       if(ma.length){f.moodTot++;if(ma.some(w=>CK_POS_MOODS.includes(w)))f.moodReg++;}
       if(ma.length&&mb.length){f.pairs++;if(!mb.some(w=>CK_POS_MOODS.includes(w))&&ma.some(w=>CK_POS_MOODS.includes(w)))f.improved++;}
-      (e.eatCtx||[]).forEach(c=>{f.ctxTot++;if(CK_GOOD_CTX.includes(c))f.ctxGood++;});
+      cx.forEach(c=>{f.ctxTot++;if(CK_GOOD_CTX.includes(c))f.ctxGood++;});
     });
   }
   const w=parseFloat(lsGet('wa_'+key,'0'))||0;
@@ -3332,6 +3337,7 @@ function _dayFacts(d){
     let sl=[];try{sl=JSON.parse(lsGet('_supplog_'+key,'[]'))||[];}catch(e){}
     let inst=0;supps.forEach(sp=>(sp.timing||[]).forEach(()=>inst++));
     f.suppSched=inst;f.suppTaken=Math.min(sl.length,inst);
+    if(sl.length)f.suppDay=1;
   }
   return f;
 }
@@ -3341,9 +3347,13 @@ function _sumFacts(days){
   t.n=days.length;
   return t;
 }
-// Each scorer: returns 0–100 or null when there is no data to judge
+// How many days back (inclusive) since this category's first data. 0 = never used.
+function _sinceFirst(all,has){
+  for(let i=all.length-1;i>=0;i--){if(has(all[i]))return i+1;}
+  return 0;
+}
 const _PROG_SCORERS={
-  workout:t=>t.planned?Math.round(t.woDone/t.planned*100):null,
+  workout:t=>t.planned?Math.min(100,Math.round(t.woAny/t.planned*100)):null,
   food:t=>{if(!t.logged)return null;
     const consistency=t.logged/t.n, protein=t.protHit/t.logged, energy=t.calOk/t.logged;
     return Math.round((consistency*0.4+protein*0.4+energy*0.2)*100);},
@@ -3363,14 +3373,21 @@ const _PROG_WEIGHTS={
 const GOAL_LABELS={muscle:'Build Muscle & Strength',fat_loss:'Lose Fat & Get Lean',fitness:'Fitness & Endurance',maintenance:'Maintain & Feel Great'};
 function computeProgress(){
   const now=new Date();
-  const all=[],recent=[],prior=[];
+  const all=[];
   for(let i=0;i<PROG_DAYS;i++){
     const d=new Date(now);d.setDate(d.getDate()-i);
-    const f=_dayFacts(d);
-    all.push(f);
-    (i<15?recent:prior).push(f);
+    all.push(_dayFacts(d));
   }
-  const tAll=_sumFacts(all),tRec=_sumFacts(recent),tPri=_sumFacts(prior);
+  // Feature-availability windows: days since first use of each feature
+  const winOf={
+    workout:Math.max(_sinceFirst(all,f=>f.woAny>0),_sinceFirst(all,f=>f.logged>0||f.waterTracked>0)), // app activity window
+    food:_sinceFirst(all,f=>f.logged>0),
+    water:_sinceFirst(all,f=>f.waterTracked>0),
+    mood:_sinceFirst(all,f=>f.ckAny>0),
+    ctx:_sinceFirst(all,f=>f.ckAny>0),
+    supps:_sinceFirst(all,f=>f.suppDay>0),
+    assess:PROG_DAYS
+  };
   const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
   const gutR=_parseAssessResult(lsGet('_assess_gut_result',null));
   const aaR=_parseAssessResult(lsGet('_assess_aa_result',null));
@@ -3378,43 +3395,62 @@ function computeProgress(){
   let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
   const goal=(profile.goal&&_PROG_WEIGHTS[profile.goal])?profile.goal:'maintenance';
   const W=_PROG_WEIGHTS[goal];
-  const trendOf=(id)=>{
-    if(id==='assess')return 0;
-    const a=_PROG_SCORERS[id](tRec),b=_PROG_SCORERS[id](tPri);
-    if(a===null||b===null)return 0;
-    return a-b;
+  const scoreIn=(id,slice)=>{
+    if(id==='assess')return Math.round(assessDone/3*100);
+    return _PROG_SCORERS[id](_sumFacts(slice));
   };
+  const catData=(id)=>{
+    const win=Math.max(1,winOf[id]||0);
+    const slice=all.slice(0,win);
+    const score=winOf[id]?scoreIn(id,slice):(id==='assess'?Math.round(assessDone/3*100):null);
+    // Trend: needs at least 10 days of history; compares halves of the feature's own window
+    let trend=0,arrow='';
+    if(score!==null&&win>=10){
+      const half=Math.floor(win/2);
+      const a=scoreIn(id,all.slice(0,half)),b=scoreIn(id,all.slice(half,win));
+      if(a!==null&&b!==null){trend=a-b;arrow=trend>=5?'↑':trend<=-5?'↓':'→';}
+    }
+    const conf=score===null?0:Math.min(1,win/14);
+    return {win,slice,score,trend,arrow,conf};
+  };
+  const tAllByCat={};
   const defs=[
-    {id:'workout',label:'Workouts',what:'Planned sessions you completed',
-     detail:tAll.woDone+' of '+tAll.planned+' planned sessions in 30 days'},
-    {id:'food',label:'Nutrition',what:'Days logged (40%) + protein goal (40%) + calories in range (20%)',
-     detail:tAll.logged+'/'+PROG_DAYS+' days logged · protein goal '+tAll.protHit+' days · calories in range '+tAll.calOk+' days'},
-    {id:'water',label:'Hydration',what:'Tracked days where you hit 80%+ of your water goal',
-     detail:tAll.waterTracked?tAll.waterMet+' of '+tAll.waterTracked+' tracked days':'No water tracked yet'},
-    {id:'mood',label:'Mood signal',what:'Meals ending calm, content or energized — plus meals that lifted your mood',
-     detail:tAll.moodTot?tAll.moodReg+'/'+tAll.moodTot+' meals ended regulated'+(tAll.improved?' · '+tAll.improved+' lifted your mood':''):'No mood check-ins yet'},
-    {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried',
-     detail:tAll.ctxTot?tAll.ctxGood+' of '+tAll.ctxTot+' check-ins':'No check-ins yet'},
-    {id:'supps',label:'Supplements',what:'Scheduled doses you took',
-     detail:tAll.suppSched?tAll.suppTaken+' of '+tAll.suppSched+' doses':'No supplements set up'},
-    {id:'assess',label:'Assessments',what:'Health assessments completed (builds your profile)',
-     detail:assessDone+'/3 complete'}
+    {id:'workout',label:'Workouts',what:'Workout days vs your planned schedule (logged sets count)'},
+    {id:'food',label:'Nutrition',what:'Days logged (40%) + protein goal (40%) + calories in range (20%)'},
+    {id:'water',label:'Hydration',what:'Tracked days where you hit 80%+ of your water goal'},
+    {id:'mood',label:'Mood signal',what:'Meals ending calm, content or energized — plus meals that lifted your mood'},
+    {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried'},
+    {id:'supps',label:'Supplements',what:'Scheduled doses you took'},
+    {id:'assess',label:'Assessments',what:'Health assessments completed (builds your profile)'}
   ];
   const cats=defs.map(c=>{
-    const score=c.id==='assess'?Math.round(assessDone/3*100):_PROG_SCORERS[c.id](tAll);
-    const tr=trendOf(c.id);
-    return {...c,score,weight:W[c.id],trend:score===null?0:tr,arrow:score===null?'':(tr>=5?'↑':tr<=-5?'↓':'→')};
+    const cd=catData(c.id);
+    const t=_sumFacts(cd.slice);
+    tAllByCat[c.id]=t;
+    let detail='';
+    if(c.id==='workout')detail=cd.score===null?'No activity yet':t.woAny+' workout days vs '+t.planned+' planned in the last '+cd.win+' days';
+    else if(c.id==='food')detail=t.logged?t.logged+'/'+cd.win+' days logged · protein goal '+t.protHit+' days · calories in range '+t.calOk+' days':'No meals logged yet';
+    else if(c.id==='water')detail=t.waterTracked?t.waterMet+' of '+t.waterTracked+' tracked days':'No water tracked yet';
+    else if(c.id==='mood')detail=t.moodTot?t.moodReg+'/'+t.moodTot+' meals ended regulated'+(t.improved?' · '+t.improved+' lifted your mood':''):'No mood check-ins yet';
+    else if(c.id==='ctx')detail=t.ctxTot?t.ctxGood+' of '+t.ctxTot+' check-ins':'No check-ins yet';
+    else if(c.id==='supps')detail=t.suppSched?t.suppTaken+' of '+t.suppSched+' doses':'No supplements set up';
+    else if(c.id==='assess')detail=assessDone+'/3 complete';
+    if(cd.score!==null&&c.id!=='assess'&&cd.win<14)detail+=' · early data ('+cd.win+(cd.win===1?' day':' days')+')';
+    return {...c,score:cd.score,weight:W[c.id],conf:cd.conf,win:cd.win,trend:cd.trend,arrow:cd.arrow,detail};
   });
   const scored=cats.filter(c=>c.score!==null);
-  const wSum=scored.reduce((a,c)=>a+c.weight,0)||1;
-  const overall=Math.round(scored.reduce((a,c)=>a+c.score*c.weight,0)/wSum);
-  const oTrend=Math.round(scored.reduce((a,c)=>a+c.trend*c.weight,0)/wSum);
+  const wSum=scored.reduce((a,c)=>a+c.weight*c.conf,0)||1;
+  const overall=Math.round(scored.reduce((a,c)=>a+c.score*c.weight*c.conf,0)/wSum);
+  const trended=scored.filter(c=>c.arrow);
+  const twSum=trended.reduce((a,c)=>a+c.weight*c.conf,0)||1;
+  const oTrend=trended.length?Math.round(trended.reduce((a,c)=>a+c.trend*c.weight*c.conf,0)/twSum):0;
   const label=overall>=80?'Strong momentum':overall>=60?'On track':overall>=40?'Building momentum':'Just getting started';
-  const trendLabel=oTrend>=5?'trending up':oTrend<=-5?'dipping lately':'holding steady';
+  const trendLabel=trended.length?(oTrend>=5?'trending up':oTrend<=-5?'dipping lately':'holding steady'):'building your baseline';
+  const tw=tAllByCat;
   return {overall,label,oTrend,trendLabel,goal,goalLabel:GOAL_LABELS[goal],cats,
-    stats:{doneWO:tAll.woDone,plannedWO:tAll.planned,daysLogged:tAll.logged,protHit:tAll.protHit,calOk:tAll.calOk,
-      waterDays:tAll.waterTracked,waterMet:tAll.waterMet,moodPos:tAll.moodReg,moodTot:tAll.moodTot,improved:tAll.improved,
-      ctxGood:tAll.ctxGood,ctxTot:tAll.ctxTot,suppTaken:tAll.suppTaken,suppTotal:tAll.suppSched,assessDone,checkins:tAll.moodTot+tAll.ctxTot,
+    stats:{doneWO:tw.workout.woAny,plannedWO:tw.workout.planned,daysLogged:tw.food.logged,protHit:tw.food.protHit,calOk:tw.food.calOk,
+      waterDays:tw.water.waterTracked,waterMet:tw.water.waterMet,moodPos:tw.mood.moodReg,moodTot:tw.mood.moodTot,improved:tw.mood.improved,
+      ctxGood:tw.ctx.ctxGood,ctxTot:tw.ctx.ctxTot,suppTaken:tw.supps.suppTaken,suppTotal:tw.supps.suppSched,assessDone,checkins:tw.mood.moodTot+tw.ctx.ctxTot,
       ns:nsR?{sympathetic:nsR.sympathetic,dorsal:nsR.dorsal,ventral:nsR.ventral,biological:nsR.biological}:null,
       gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
       aa:aaR?{taken:true}:null}};
@@ -3429,13 +3465,13 @@ function rProgressCard(){
       <div style="font-size:10px;color:var(--sub)">Last 30 days</div>
     </div>
     <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 2px">
-      <div style="font-size:36px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}</div>
+      <div style="font-size:36px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}<span style="font-size:15px;font-weight:700;color:var(--sub)">/100</span></div>
       <div>
         <div style="font-size:14px;font-weight:700">${pr.label} <span style="font-size:12px;font-weight:600;color:var(--sub)">· ${pr.trendLabel}</span></div>
         <div style="font-size:10px;color:var(--sub)">Weighted for your goal: ${pr.goalLabel}</div>
       </div>
     </div>
-    <div style="font-size:10.5px;color:var(--sub);line-height:1.45;margin:6px 0 12px">This measures your consistency — what you do, not your body. Arrows compare your last 15 days to the 15 before.</div>
+    <div style="font-size:10.5px;color:var(--sub);line-height:1.45;margin:6px 0 12px">This measures your consistency — what you do, not your body. Each category only counts days since you started using that feature.</div>
     ${pr.cats.map(c=>`<div style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;margin-bottom:1px">
         <span style="font-weight:600">${c.label}</span>
@@ -3448,7 +3484,7 @@ function rProgressCard(){
     <details style="margin-top:4px">
       <summary style="font-size:11px;color:var(--sub);cursor:pointer">How scoring works</summary>
       <div style="font-size:11px;color:var(--sub);line-height:1.6;padding:8px 2px 0">
-        Every score is a simple ratio of <strong style="color:var(--text)">what you did ÷ what was planned</strong> over the last 30 days. Categories with no data show "—" and don't count against you. Missing a single day barely moves a score — research shows consistency over time builds habits, not perfection. Your overall number weights the categories that matter most for your goal (${pr.goalLabel}): ${pr.cats.filter(c=>c.score!==null).map(c=>c.label+' '+Math.round(c.weight*100)+'%').join(' · ')}.
+        Every score (out of 100) is a simple ratio of <strong style="color:var(--text)">what you did ÷ what was planned</strong>. Each category only counts the days since you first used that feature — new features start fresh instead of counting old empty days, and categories with under two weeks of history count less toward your overall while they ramp up. Categories with no data show "—" and don't count against you. Missing a single day barely moves a score — research shows consistency over time builds habits, not perfection. Trend arrows compare the two halves of each category's own history (shown once it has 10+ days). Your overall weights the categories that matter most for your goal (${pr.goalLabel}): ${pr.cats.filter(c=>c.score!==null).map(c=>c.label+' '+Math.round(c.weight*100)+'%').join(' · ')}.
       </div>
     </details>
   </div>`;
