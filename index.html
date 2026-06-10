@@ -2884,7 +2884,7 @@ function rFood(){
           <div class="fth">${e.photo?`<img src="${e.photo}" alt="">`:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3v2"/><path d="M21 22v-7"/></svg>`}</div>
           <div style="flex:1">
             <div class="fn">${e.name}</div>
-            <div class="ftm">${e.time}</div>
+            <div class="ftm">${e.time||e.t||(e.ts?new Date(e.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')}</div>
             <div class="fm">
               <div class="fmv" style="color:var(--green)">${e.p}g <span>P</span></div>
               <div class="fmv" style="color:var(--orange)">${e.c}g <span>C</span></div>
