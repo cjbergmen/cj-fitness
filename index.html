@@ -3436,7 +3436,7 @@ function computeProgress(){
     else if(c.id==='supps')detail=t.suppSched?t.suppTaken+' of '+t.suppSched+' doses':'No supplements set up';
     else if(c.id==='assess')detail=assessDone+'/3 complete';
     if(cd.score!==null&&c.id!=='assess'&&cd.win<14)detail+=' · early data ('+cd.win+(cd.win===1?' day':' days')+')';
-    return {...c,score:cd.score,weight:W[c.id],conf:cd.conf,win:cd.win,trend:cd.trend,arrow:cd.arrow,detail};
+    return {...c,score:cd.score,weight:W[c.id],conf:cd.conf,win:cd.win,trend:cd.trend,arrow:cd.arrow,detail,_t:t};
   });
   const scored=cats.filter(c=>c.score!==null);
   const wSum=scored.reduce((a,c)=>a+c.weight*c.conf,0)||1;
@@ -3455,25 +3455,29 @@ function computeProgress(){
       gut:gutR?{total:gutR.total,severity:gutR.severity}:null,
       aa:aaR?{taken:true}:null}};
 }
-// Pick the single best growth opportunity for the week: biggest gap × goal weight,
-// preferring categories with enough history to judge (conf ≥ .5)
+// Pick this week's focus (#1 gap × goal weight) and a quick win (#2 gap),
+// each with a one-liner built from the user's actual numbers.
+function _focusLine(c,t,assessDone){
+  if(c.id==='workout')return t.woAny+' of '+t.planned+' planned sessions done — schedule the missing '+Math.max(0,t.planned-t.woAny)+'.';
+  if(c.id==='food')return 'Protein goal hit '+t.protHit+' of '+t.logged+' logged days — plan protein first at each meal.';
+  if(c.id==='water')return 'Water goal hit '+t.waterMet+' of '+t.waterTracked+' tracked days — one extra glass closes the gap.';
+  if(c.id==='mood')return t.moodReg+' of '+t.moodTot+' meals ended regulated — pause for one slow breath before eating.';
+  if(c.id==='ctx')return t.ctxGood+' of '+t.ctxTot+' meals were unhurried — slow down for one meal a day.';
+  if(c.id==='supps')return t.suppTaken+' of '+t.suppSched+' doses taken — tie them to a daily habit.';
+  if(c.id==='assess')return assessDone+'/3 complete — each takes about 5 minutes.';
+  return '';
+}
 function pickWeeklyFocus(pr){
-  const lines={
-    workout:'Get to every planned workout this week — even a short session counts.',
-    food:'Log your meals each day and aim for your protein goal.',
-    water:'Hit at least 80% of your water goal most days this week.',
-    mood:'Before you eat, pause for one slow breath — notice what shifts.',
-    ctx:'Slow down for one meal a day — sit, relax, no rushing.',
-    supps:'Take your supplements as scheduled — tie them to a daily habit.',
-    assess:'Finish your remaining assessments — about 5 minutes each.'
-  };
   const cands=pr.cats.filter(c=>c.score!==null);
-  if(!cands.length||(cands.length===1&&cands[0].id==='assess'&&cands[0].score===0))return {label:'Get started',line:'Log a meal or a workout today — your story starts with one entry.'};
+  if(!cands.length||(cands.length===1&&cands[0].id==='assess'&&cands[0].score===0))
+    return {focus:{label:'Get started',line:'Log a meal or a workout today — your story starts with one entry.'},quick:null};
   let pool=cands.filter(c=>c.conf>=0.5);
   if(!pool.length)pool=cands;
-  if(pool.every(c=>c.score>=85))return {label:'Keep it rolling',line:'Everything is on track — protect your routine this week.'};
-  const f=pool.reduce((a,c)=>((100-c.score)*c.weight>(100-a.score)*a.weight?c:a));
-  return {label:f.label,line:lines[f.id]||''};
+  if(pool.every(c=>c.score>=85))
+    return {focus:{label:'Keep it rolling',line:'Everything is on track — protect your routine this week.'},quick:null};
+  const ranked=pool.slice().sort((a,c)=>((100-c.score)*c.weight)-((100-a.score)*a.weight));
+  const mk=c=>({label:c.label,line:_focusLine(c,c._t,pr.stats.assessDone)});
+  return {focus:mk(ranked[0]),quick:ranked.length>1&&ranked[1].score<85?mk(ranked[1]):null};
 }
 function rProgressCard(){
   const pr=computeProgress();
@@ -3490,9 +3494,14 @@ function rProgressCard(){
       <div style="font-size:15px;font-weight:700">${pr.label}<div style="font-size:12px;font-weight:600;color:var(--sub)">${pr.trendLabel}</div></div>
     </div>
     <div style="background:var(--surface2);border-left:3px solid var(--green);border-radius:var(--rs);padding:12px 14px;margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:4px">🎯 This week's focus</div>
-      <div style="font-size:17px;font-weight:800;margin-bottom:4px">${focus.label}</div>
-      <div style="font-size:13.5px;line-height:1.5">${focus.line}</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:4px">This week's focus</div>
+      <div style="font-size:17px;font-weight:800;margin-bottom:4px">${focus.focus.label}</div>
+      <div style="font-size:13.5px;line-height:1.5">${focus.focus.line}</div>
+      ${focus.quick?`<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:4px">Quick win</div>
+        <div style="font-size:14.5px;font-weight:700;margin-bottom:3px">${focus.quick.label}</div>
+        <div style="font-size:13px;line-height:1.5;color:var(--sub)">${focus.quick.line}</div>
+      </div>`:''}
     </div>
     ${pr.cats.map(c=>`<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:3px">
@@ -3533,17 +3542,23 @@ async function runWeeklyReview(){
     const pr=computeProgress();
     let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
     const st=pr.stats;
-    const prompt=`You are a trauma-informed functional health coach reviewing a client's last 30 days. Be warm, specific and encouraging — never shaming. Their goal: ${pr.goalLabel}. Stress level: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
+    const fx=pickWeeklyFocus(pr);
+    const prompt=`You are a trauma-informed functional health coach writing a short weekly note to a client. Warm, specific, encouraging — never shaming. Never mention AI, models, or data systems; write as their coach. Their goal: ${pr.goalLabel}. Stress: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
 
-30-DAY DATA (each category: score 0-100, trend = last 15 days vs prior 15):
+THIS WEEK'S FOCUS: ${fx.focus.label} — ${fx.focus.line}
+${fx.quick?'QUICK WIN: '+fx.quick.label+' — '+fx.quick.line:''}
+
+30-DAY DATA (score 0-100, trend = last half vs prior half of each category's history):
 - Overall: ${pr.overall}/100 (${pr.label}, ${pr.trendLabel})
 ${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, trend '+(c.trend>0?'+':'')+c.trend)+' ('+c.detail+')').join('\n')}
 - Nervous system assessment: ${st.ns?JSON.stringify(st.ns):'not taken'}
 - Gut assessment: ${st.gut?JSON.stringify(st.gut):'not taken'}
 - Amino acid assessment: ${st.aa?'taken':'not taken'}
 
+Write ONE single paragraph (4-6 sentences) that expands on the focus and quick win above: name a genuine win from the data, then make the focus and quick win feel doable and worth it this week. No lists, no headers.
+
 Respond ONLY with valid JSON, no markdown:
-{"statement":"2-3 warm sentences on their progress toward their goal, naming one genuine win and one honest growth area","suggestions":["3-5 specific, doable suggestions tied to the data"],"adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
+{"paragraph":"the single paragraph","adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash-lite`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})
@@ -3557,8 +3572,8 @@ Respond ONLY with valid JSON, no markdown:
       const raw=data?.candidates?.[0]?.content?.parts?.map(pt=>pt.text||'').join('')||'';
       const jm=raw.match(/\{[\s\S]*\}/);
       const out=jm?JSON.parse(jm[0]):null;
-      if(out&&out.statement){
-        const rec={ts:Date.now(),statement:out.statement,suggestions:Array.isArray(out.suggestions)?out.suggestions:[],adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
+      if(out&&(out.paragraph||out.statement)){
+        const rec={ts:Date.now(),paragraph:out.paragraph||out.statement,adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
         lsSet('_aiWeekly',JSON.stringify(rec));
         try{fbSyncSettings();}catch(e){}
       }else{
@@ -3571,21 +3586,18 @@ Respond ONLY with valid JSON, no markdown:
 }
 function rAIWeeklyCard(){
   const r=getAIWeekly();
+  const para=r?(r.paragraph||r.statement||''):'';
   return `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div class="ct" style="padding:0;margin:0">✨ Weekly AI Review</div>
+      <div class="ct" style="padding:0;margin:0">Weekly Review</div>
       ${r?`<div style="font-size:11px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
     </div>
-    ${_aiWeeklyLoading?`<div style="font-size:14px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
-      r?`<div style="font-size:14px;line-height:1.6;margin-bottom:8px">${r.statement}</div>
-      ${(r.suggestions||[]).length?`<details style="margin-bottom:8px">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer">Suggestions (${r.suggestions.length})</summary>
-        <div style="padding-top:6px">${r.suggestions.map(sg=>`<div style="font-size:13px;line-height:1.5;padding:8px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px">💡 ${sg}</div>`).join('')}</div>
-      </details>`:''}
+    ${_aiWeeklyLoading?`<div style="font-size:15px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
+      r?`<div style="font-size:15px;line-height:1.65;margin-bottom:10px">${para}</div>
       ${r.adjustPlan?`<button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
-      `<div style="font-size:14px;color:var(--sub);line-height:1.5;margin-bottom:10px">Runs weekly on your last 30 days — a short progress statement plus suggestions.</div>`}
+      `<div style="font-size:15px;color:var(--sub);line-height:1.55;margin-bottom:10px">A short note on your progress, refreshed each week from your last 30 days.</div>`}
     ${_aiWeeklyErrMsg?`<div style="font-size:12px;color:var(--red);line-height:1.5;margin-bottom:8px">${_aiWeeklyErrMsg}</div>`:''}
-    ${_aiWeeklyLoading?'':`<button class="btn btn-s btn-sm btn-f" onclick="runWeeklyReview()">${r?'↻ Run Review Now':'Run First Review'}</button>`}
+    ${_aiWeeklyLoading?'':`<button onclick="runWeeklyReview()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 0">${r?'Refresh review':'Run first review'}</button>`}
   </div>`;
 }
 
@@ -3631,7 +3643,7 @@ function rAssessHub(){
     ${doneCards}
     ${todoCards?`<div class="ct" style="padding:8px 3px 9px">Assessments to complete</div>
     <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:var(--rs);border:1px solid var(--border)">
-      These assessments build your health profile. Your scores inform your AI recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.
+      These assessments build your health profile. Your scores inform your recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.
     </div>${todoCards}`:''}
     <div class="card" style="margin-bottom:12px;opacity:0.7">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -7149,16 +7161,16 @@ function renderWizStep(s){
   }
   if(s.type==='assess'){
     const cards=[
-      {em:'🧠',t:'Nervous System Assessment',d:'Identify your nervous system pattern — activation, shutdown, or regulation — based on the last 7 days.'},
-      {em:'🦠',t:'Gut Health Assessment',d:'Evaluate gut-brain markers: inflammation, leaky gut, sleep, and mood connections.'},
-      {em:'🧬',t:'Amino Acid Assessment',d:'Spot neurotransmitter imbalances affecting mood, energy, stress, and cravings.'},
+      {ic:ASSESS_NS.icon,t:'Nervous System Assessment',d:'Identify your nervous system pattern — activation, shutdown, or regulation — based on the last 7 days.'},
+      {ic:ASSESS_GUT.icon,t:'Gut Health Assessment',d:'Evaluate gut-brain markers: inflammation, leaky gut, sleep, and mood connections.'},
+      {ic:ASSESS_AA.icon,t:'Amino Acid Assessment',d:'Spot neurotransmitter imbalances affecting mood, energy, stress, and cravings.'},
     ];
     return `<div style="display:flex;flex-direction:column;align-items:center;padding:20px 0 10px">
       <div class="wiz-title">Build your health profile</div>
-      <div class="wiz-sub">Three short assessments personalize your AI recommendations, recovery plan, and practitioner reports — about 3–5 minutes each. You can also take them anytime from the Assessments tab.</div>
+      <div class="wiz-sub">Three short assessments personalize your recommendations, recovery plan, and practitioner reports — about 3–5 minutes each. You can also take them anytime from the Assessments tab.</div>
       <div style="width:100%">
         ${cards.map(c=>`<div class="wiz-done-card" style="display:flex;gap:12px;align-items:flex-start">
-          <div style="font-size:26px;line-height:1">${c.em}</div>
+          <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.ic}</svg></div>
           <div><div class="wiz-done-card-title" style="margin-bottom:2px">${c.t}</div>
           <div style="font-size:12px;color:var(--sub);line-height:1.5">${c.d}</div></div>
         </div>`).join('')}
