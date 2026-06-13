@@ -463,6 +463,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-row h4{font-size:13.5px;font-weight:700}
 .mk-row small{font-size:11px;color:var(--sub)}
 .mk-link{background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;padding:0}
+.mk-q{font-family:var(--font-serif);font-size:19px;font-weight:500;margin-top:4px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -2785,9 +2786,10 @@ function rWorkout(){
     if(names.every(n=>/full body/i.test(n)))splitTitle='This Week\'s Full Body Plan';
     else if(names.some(n=>/upper/i.test(n))&&names.some(n=>/lower/i.test(n)))splitTitle='This Week\'s Upper/Lower Split';
     else if(names.some(n=>/push/i.test(n))&&names.some(n=>/pull/i.test(n)))splitTitle='This Week\'s Push/Pull/Legs Split';
-    h=`<div class="rdb" style="margin-top:10px">
-      <div style="font-size:17px;font-weight:700">Rest Day</div>
-      <div style="font-size:13px;color:var(--sub);margin-top:5px">Recovery + contrast therapy</div></div>
+    h=`<div class="fdn-focus" style="margin-bottom:12px">
+      <span class="kicker">Today · Recovery</span>
+      <h3>Rest day</h3>
+      <p>Movement heals only when the body can afford it. Today is for walking, mobility, and contrast therapy — under-recovery is when progress quietly stalls.</p></div>
       <div class="card"><div class="ct">${splitTitle}</div>`;
     activeDays.forEach(d=>{
       const w=weekWO[d];
@@ -2827,11 +2829,7 @@ function rWorkout(){
       <div><div class="wo-label">Workout Complete!</div><div class="wo-sub">Tap to undo</div></div>
     </div>`;
   }
-  h+=`<div style="margin-bottom:14px">
-    <div style="font-size:19px;font-weight:800;letter-spacing:-.5px;margin-bottom:2px">${wo.name}</div>
-    <div style="font-size:12px;color:var(--sub)">${wo.dur||'45 min'} · Rest-Pause: fail → 15 sec → 3–5 more → 15 sec → 3–5 more</div>
-  </div>
-`;
+  h+=_exHeroBlock(wo);
   if(wo.info){
     const inf=wo.info;
     h+=`<div class="wo-info-wrap" id="wic-today" onclick="flipWOCard('wic-today',event)">
@@ -3068,6 +3066,20 @@ let _nsExpanded = null;
 
 function rRecovery(){
   let h = '';
+
+  // ── FDN state check-in + suggested practice (mockup Stress board) ──
+  const _ss=lsGet('stress_'+viewDate,'');
+  const _states=[['wired','Wired'],['steady','Steady'],['foggy','Foggy'],['drained','Drained']];
+  h += `<div class="card"><span class="kicker" style="color:var(--sub)">Quick check-in</span>
+    <h3 class="mk-q">How's your system right now?</h3>
+    <div class="mood-row">${_states.map(([k,l])=>`<button class="${_ss===k?'sel':''}" onclick="setStressState('${k}')">${l}</button>`).join('')}</div>
+    <p style="font-size:11.5px;color:var(--sub);margin-top:9px;line-height:1.45">Your answer shapes today's suggestion — wired days get grounding, drained days get gentleness.</p></div>`;
+  if(_ss && typeof STRESS_SUGGEST!=='undefined' && STRESS_SUGGEST[_ss]){
+    const sg=STRESS_SUGGEST[_ss];
+    h += `<div class="fdn-focus" style="margin-bottom:12px"><span class="kicker">${sg.k}</span><h3>${sg.t}</h3><p>${sg.b}</p>
+      <button class="btn" style="margin-top:11px;background:var(--purple);color:var(--text);border:none" onclick="beginSuggested()">Begin a practice</button></div>`;
+  }
+  h += `<div class="ct" style="padding:4px 3px 8px">More practices</div>`;
 
   // Category filter
   h += `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none">`;
@@ -8826,6 +8838,45 @@ function rDiet(){
   document.getElementById('page-food').innerHTML=h;
 }
 
+/* ════════════ EXERCISE hero (mockup) ════════════ */
+function _exReadiness(){
+  let hrs=0;try{const r=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));if(r)hrs=r.h||0;}catch(e){}
+  if(hrs&&hrs<6.5)return {c:'#d9b4a3',t:'Recovery is light — the plan eases off before it pushes today'};
+  if(hrs&&hrs>=7)return {c:'var(--purple)',t:'Recovery signals look good — full intensity today'};
+  return {c:'var(--purple)',t:'Log last night\'s sleep on Rest to tune today\'s intensity'};
+}
+function _exStreak(){let s=0;for(let i=0;i<90;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(lsGet('wd_'+k,'0')==='1')s++;else if(i>0)break;}return s;}
+function _exHeroBlock(wo){
+  const cnt=wo.ex?wo.ex.length:(wo.phases?wo.phases.length:0);
+  const r=_exReadiness();const streak=_exStreak();
+  const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][vdDate().getDay()];
+  return `<div class="fdn-focus" style="margin-bottom:12px">
+    <span class="kicker">Today · ${dayName}</span>
+    <h3>${wo.name}</h3>
+    <p>${cnt} exercise${cnt===1?'':'s'} · rest-pause sets · ${wo.dur||'~40 min'}</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:11px;font-size:11.5px;color:#c8cdd2"><span style="width:8px;height:8px;border-radius:50%;background:${r.c};flex:none"></span>${r.t}</div>
+  </div>
+  <div class="card" style="display:flex;gap:12px;align-items:flex-start">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+    <p style="font-size:12px;line-height:1.5;color:var(--sub)">On rough-sleep weeks the plan adapts down before it pushes up — consistency beats intensity.${streak>1?` <b style="color:var(--text)">${streak}-day streak.</b>`:''}</p>
+  </div>`;
+}
+
+/* ════════════ STRESS suggestions (mockup) ════════════ */
+const STRESS_SUGGEST={
+  wired:{k:'Suggested for wired',t:'Long, slow exhale',b:'When the system is revved, lengthening the exhale signals the threat has passed. Try 4 in, 8 out for a few minutes — and reduce inputs.',cat:'breathing'},
+  steady:{k:'Suggested for steady',t:'Keep the tone up',b:'You\'re in a good window. A few minutes of calm breathing or a short walk banks resilience for the harder moments later.',cat:'breathing'},
+  foggy:{k:'Suggested for foggy',t:'Light and movement first',b:'Fog usually lifts faster with outdoor light and a short walk than with more caffeine. Ten minutes outside is the experiment.',cat:'rest'},
+  drained:{k:'Suggested for drained',t:'Do less, gently',b:'Nothing left in the tank means the move is gentleness — warmth, rest, easy connection. Pushing harder digs the hole deeper.',cat:'rest'}
+};
+function setStressState(s){lsSet('stress_'+viewDate,s);try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}rRecovery();}
+function beginSuggested(){
+  const s=lsGet('stress_'+viewDate,'steady');const cat=(STRESS_SUGGEST[s]||{}).cat;
+  try{const act=(typeof NS_ACT!=='undefined')?NS_ACT.find(a=>a.cat===cat):null;
+    if(act&&typeof setNSExpand==='function'){setNSExpand(act.id);return;}}catch(e){}
+  showToast('Pick a practice below');
+}
+
 /* ════════════ DIET EXTRAS (hydration + blood sugar) ════════════ */
 function _bsGet(){try{return JSON.parse(lsGet('bs_'+viewDate,'[]'))||[];}catch(e){return [];}}
 function addBS(){
@@ -9024,7 +9075,7 @@ async function detSend(forced){
     const prompt=[DET_SYS,KB_CORE,_retrieveDeep(q),_gatesNote(),_detContext(),'CONVERSATION:\n'+transcript,'Reply as the Detective to the latest user message. Remember: ground in their data, one experiment, the footer lines.'].filter(Boolean).join('\n\n');
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:520}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:900,thinkingConfig:{thinkingBudget:0}}})
     });
     if(res.status===429){_detReplace("We've hit today's free AI limit. The Detective needs the paid key to run reliably — for now, try again in a bit.");return;}
     const data=await res.json();
