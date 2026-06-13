@@ -464,6 +464,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-row small{font-size:11px;color:var(--sub)}
 .mk-link{background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;padding:0}
 .mk-q{font-family:var(--font-serif);font-size:19px;font-weight:500;margin-top:4px}
+
+/* ── exercise how-to: animated blue silhouette ── */
+.ex-anim{display:flex;justify-content:center;align-items:center;background:rgba(122,154,171,.10);border:1px solid var(--border);border-radius:14px;padding:6px 0;margin-bottom:12px}
+.ex-anim svg{width:116px;height:116px}
+.ex-fig{stroke:var(--blue);stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
+.ex-anim .an{will-change:transform}
+@keyframes exArmUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes exBob{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+@keyframes exBobUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes exHover{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes exFore{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.ex-anim[data-p="press"] .an{animation:exArmUp 1.5s ease-in-out infinite}
+.ex-anim[data-p="raise"] .an{animation:exArmUp 1.8s ease-in-out infinite}
+.ex-anim[data-p="curl"] .an{animation:exFore 1.4s ease-in-out infinite}
+.ex-anim[data-p="squat"] .an{animation:exBob 1.8s ease-in-out infinite}
+.ex-anim[data-p="hinge"] .an{animation:exBob 2s ease-in-out infinite}
+.ex-anim[data-p="pull"] .an{animation:exBobUp 1.6s ease-in-out infinite}
+.ex-anim[data-p="core"] .an{animation:exHover 2.2s ease-in-out infinite}
+.ex-anim[data-p="stand"] .an{animation:exHover 2.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ex-anim .an{animation:none}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -783,15 +804,24 @@ const firebaseConfig = {
   appId: "1:980408905992:web:c7f523763aa8de17763cbd"
 };
 let fbApp, fbAuth, fbDb, fbUser=null, _fbSyncing=false;
-try {
-  fbApp = firebase.initializeApp(firebaseConfig);
-  fbAuth = firebase.auth();
-  fbDb = firebase.firestore();
-  // Enable offline persistence for instant loads
-  fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
-} catch(e) { console.warn('Firebase init failed:', e); }
+// ── PREVIEW SANDBOX ──────────────────────────────────────────────────────
+// This file is an ISOLATED design preview (metastory-fdn.html). Firebase is
+// intentionally NOT initialized here, so the preview can never read from or
+// write to the real cloud account. All data is local + sample-only. This is
+// the guardrail that prevents the preview from ever touching live data again.
+// To turn this fork into the real app later, set PREVIEW_SANDBOX = false.
+const PREVIEW_SANDBOX = false;
+if(!PREVIEW_SANDBOX){
+  try {
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  } catch(e) { console.warn('Firebase init failed:', e); }
+}
 
 function toggleAuth(){
+  if(PREVIEW_SANDBOX){showToast('Preview mode — not connected to your account');return;}
   if(fbUser) {
     if(confirm('Sign out?')) fbAuth.signOut();
   } else {
@@ -816,6 +846,7 @@ function closeUserMenu(){
   if(dd) dd.style.display = 'none';
 }
 function handleUserMenuAuth(){
+  if(PREVIEW_SANDBOX){showToast('Preview mode — not connected to your account');return;}
   if(fbUser){
     if(confirm('Sign out?')) fbAuth.signOut();
   } else {
@@ -1080,27 +1111,19 @@ async function fbPullAll(){
         if(s.assessGut) lsSet('_assess_gut_result', JSON.stringify(s.assessGut));
         if(s.assessAa) lsSet('_assess_aa_result', JSON.stringify(s.assessAa));
         if(s.foodLib && s.foodLib.length) {
-          const localLib = getLib();
-          // Merge: start with cloud items, then add local items not already present
-          // Deduplicate by BOTH id and name to prevent same-food accumulating multiple entries
-          const merged = [...s.foodLib];
-          const mergedIds = new Set(merged.map(x=>x.id));
-          const mergedNames = new Set(merged.map(x=>(x.n||'').toLowerCase().trim()));
-          localLib.forEach(localItem => {
-            const lName = (localItem.n||'').toLowerCase().trim();
-            if(!mergedIds.has(localItem.id) && !mergedNames.has(lName)) {
-              merged.push(localItem);
-              mergedIds.add(localItem.id);
-              mergedNames.add(lName);
-            }
-          });
-          lsSet('_foodlib', JSON.stringify(merged));
+          // Cloud is the source of truth — use the cloud library EXACTLY as stored.
+          // No client-side merge/recompute, so categories can never drift by version.
+          lsSet('_foodlib', JSON.stringify(s.foodLib));
+          // One-time safety backup of the authoritative cloud library (additive field).
+          if(!s.foodLibBackupV2 && fbDb && fbUser){
+            try{ fbDb.collection('users').doc(fbUser.uid).set({settings:{foodLibBackupV2:s.foodLib, foodLibBackupAt:Date.now()}},{merge:true}); }catch(e){}
+          }
         }
       }
     }
     // Guard: if auth changed mid-pull, abort — prevents writing wrong user's settings to Firebase
     if(!fbUser || fbUser.uid !== uid) { console.warn('[fbPullAll] auth changed mid-pull, aborting post-pull actions'); _fbSyncing = false; return false; }
-    importHistoryToLib();
+    // (library history-import disabled — cloud library is authoritative)
     refresh();
     if(curPage!=='workout')render('workout');
     // Auto-generate routine for users who have profile data but no saved routine
@@ -2197,7 +2220,8 @@ function buildExCard(e,idx,num,col,wdone){
       </div>
       <button onclick="flipExCard(${idx},event)" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text);font-size:11px;font-weight:600;padding:5px 10px;cursor:pointer;white-space:nowrap">← Log sets</button>
     </div>`;
-    if(how.muscles){bh+=`<div style="font-size:11px;font-weight:700;color:${col};background:${col}18;padding:5px 9px;border-radius:7px;margin-bottom:10px">💪 ${how.muscles}</div>`;}
+    bh+=_exAnim(name);
+    if(how.muscles){bh+=`<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${col};background:${col}18;padding:6px 9px;border-radius:7px;margin-bottom:10px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M3 9v6M21 9v6M7 8v8M17 8v8"/></svg>${how.muscles}</div>`;}
     bh+=`<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">`;
     how.steps.forEach((s,si)=>{
       bh+=`<div style="display:flex;gap:9px;align-items:flex-start">
@@ -2206,7 +2230,7 @@ function buildExCard(e,idx,num,col,wdone){
       </div>`;
     });
     bh+=`</div>`;
-    if(how.key){bh+=`<div style="background:${col}15;border-left:3px solid ${col};border-radius:0 7px 7px 0;padding:8px 11px;font-size:11.5px;font-style:italic;line-height:1.45;color:var(--text)">🔑 ${how.key}</div>`;}
+    if(how.key){bh+=`<div style="display:flex;gap:7px;align-items:flex-start;background:${col}15;border-left:3px solid ${col};border-radius:0 7px 7px 0;padding:8px 11px;font-size:11.5px;font-style:italic;line-height:1.45;color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c.7.7 1 1.6 1 2.5h6c0-.9.3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg><span>${how.key}</span></div>`;}
     bh+=`</div>`;
     return bh;
   }
@@ -2218,14 +2242,14 @@ function buildExCard(e,idx,num,col,wdone){
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${_woPendingSwaps[idx]?`<span style="font-size:10px;background:var(--orange)22;color:var(--orange);padding:2px 6px;border-radius:8px;font-weight:700">modified</span>`:''}
         <button onclick="openSwapModal(${idx},event)" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 9px;cursor:pointer;white-space:nowrap">↔</button>
-        ${how?`<button onclick="flipExCard(${idx},event)" style="background:none;border:none;color:var(--sub);font-size:16px;cursor:pointer;padding:0;line-height:1" title="How to do it">ⓘ</button>`:''}
+        ${how?`<button onclick="flipExCard(${idx},event)" style="display:flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;white-space:nowrap" title="How to do it"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>How</button>`:''}
       </div>
     </div>
     <div><span class="wo-ex-tag" style="background:${col}22;color:${col}">${e.tag}</span></div>
     <div class="wo-ex-inst">${e.i} · Rest: ${e.rest}</div>
   </div>`;
   if(lastSets&&lastSets.length){
-    h+=`<div class="wo-last-hint">📊 Last: ${fmtLastSets(lastSets)}</div>`;
+    h+=`<div class="wo-last-hint" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Last: ${fmtLastSets(lastSets)}</div>`;
   }
   if(todaySets.length){
     h+=`<div class="wo-sets-list">`;
@@ -2920,7 +2944,7 @@ function rWorkout(){
     h+=buildExCard(e,idx,mainNumMap[e.n],wo.col,wdone);
   });
   if(wo.pm&&wo.pm.length){
-    h+=`<div class="ct" style="padding:14px 3px 9px">🌙 PM Boost · 15 min · Optional</div>`;
+    h+=`<div class="ct" style="padding:14px 3px 9px;display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/></svg>PM Boost · 15 min · Optional</div>`;
     const pmNumMap={};wo.pm.forEach((e,i)=>{pmNumMap[e.n]=i+1;});
     const pmSorted=[...wo.pm.filter(e=>!_isDone(e.n)),...wo.pm.filter(e=>_isDone(e.n))];
     pmSorted.forEach(e=>{
@@ -6885,9 +6909,14 @@ migrateUTCData();
 initHeader();
 rToday();
 initLib();
-importHistoryToLib();
-migrateLibCategories();
-restoreLibCategories();
+// ── CLOUD IS THE SOURCE OF TRUTH FOR THE FOOD LIBRARY ──────────────────────
+// The old client-side rebuild/migrate/restore routines recomputed food
+// categories on every load and pushed them back to the cloud, so the library
+// drifted depending on which version/browser last synced — and that flattened
+// all categories in the category incident (June 13). They are intentionally
+// NOT auto-run anymore. The library is whatever the cloud holds; it changes
+// only on explicit user edits. (Functions kept for manual/legacy use.)
+// importHistoryToLib();  migrateLibCategories();  restoreLibCategories();
 autoRestoreIfEmpty();
 // Only check onboarding at startup if Firebase isn't configured — otherwise
 // the onAuthStateChanged handler calls checkOnboarding() after fbPullAll() finishes,
@@ -7145,13 +7174,13 @@ function renderWizStep(s){
   if(s.type==='bodytype'){
     const sel=_wiz.profile.bodyType||null;
     const types=[
-      {val:'ectomorph',em:'🔥',label:'Ectomorph',sub:'Lean & lanky, fast metabolism, hard to gain weight',
+      {val:'ectomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4L9 15"/><path d="M20 4c-6 0-11 2-13 7-1 3 0 6 0 6s3 1 6 0c5-2 7-7 7-13z"/></svg>',label:'Ectomorph',sub:'Lean & lanky, fast metabolism, hard to gain weight',
        desc:'Your body burns through calories quickly. You need higher carbs and more total food to build muscle.',
        traits:'Fast metabolism · Hard gainer · Responds well to higher carbs'},
-      {val:'mesomorph',em:'💪',label:'Mesomorph',sub:'Athletic build, gains muscle and loses fat easily',
+      {val:'mesomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M3 9v6M21 9v6M7 8v8M17 8v8"/></svg>',label:'Mesomorph',sub:'Athletic build, gains muscle and loses fat easily',
        desc:'You respond well to most training styles. Balanced macros work best — moderate protein, carbs, and fat.',
        traits:'Athletic frame · Gains & loses easily · Balanced macros'},
-      {val:'endomorph',em:'🛡️',label:'Endomorph',sub:'Naturally broader, stores fat easily, slower metabolism',
+      {val:'endomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg>',label:'Endomorph',sub:'Naturally broader, stores fat easily, slower metabolism',
        desc:'Your body is carb-sensitive. Lower carb, higher protein, and strategic nutrition will get you the best results.',
        traits:'Slower metabolism · Carb-sensitive · Builds strength easily'},
     ];
@@ -7161,7 +7190,7 @@ function renderWizStep(s){
         ${types.map(t=>`
           <div onclick="wizSel('bodyType','${t.val}')" style="padding:14px 16px;background:var(--surface2);border:1.5px solid ${sel===t.val?'var(--green)':'var(--border)'};border-radius:14px;cursor:pointer;transition:border-color .15s${sel===t.val?';background:rgba(171,108,82,.08)':''}">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
-              <span style="font-size:22px">${t.em}</span>
+              <span style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--green)">${t.icon}</span>
               <div>
                 <div style="font-size:15px;font-weight:700;color:var(--text)">${t.label}</div>
                 <div style="font-size:12px;color:var(--sub);margin-top:1px">${t.sub}</div>
@@ -8838,6 +8867,36 @@ function rDiet(){
   document.getElementById('page-food').innerHTML=h;
 }
 
+/* ════════════ EXERCISE how-to silhouette ════════════ */
+function _exPattern(name){
+  const n=(name||'').toLowerCase();
+  if(/lateral|rear delt|side raise/.test(n))return 'raise';
+  if(/curl/.test(n))return 'curl';
+  if(/press|push[- ]?up|chest fly|chest flye|pullover|skull|tricep|kickback|extension/.test(n))return 'press';
+  if(/squat|lunge|step[- ]?up|split squat|calf/.test(n))return 'squat';
+  if(/rdl|romanian|deadlift|hinge/.test(n))return 'hinge';
+  if(/pull[- ]?up|pull up|chin[- ]?up|\brow\b/.test(n))return 'pull';
+  if(/plank|knee raise|hanging|leg raise|crunch|core|hollow/.test(n))return 'core';
+  if(/\bfly|flye\b/.test(n))return 'raise';
+  return 'stand';
+}
+function _exPose(p){
+  switch(p){
+    case 'press': return '<circle class="hd" cx="60" cy="30" r="9"/><line x1="60" y1="39" x2="60" y2="74"/><line x1="60" y1="74" x2="48" y2="104"/><line x1="60" y1="74" x2="72" y2="104"/><g class="an"><line x1="60" y1="46" x2="46" y2="22"/><line x1="60" y1="46" x2="74" y2="22"/><circle class="bell" cx="44" cy="19" r="5.5"/><circle class="bell" cx="76" cy="19" r="5.5"/></g>';
+    case 'raise': return '<circle class="hd" cx="60" cy="26" r="9"/><line x1="60" y1="35" x2="60" y2="72"/><line x1="60" y1="72" x2="48" y2="104"/><line x1="60" y1="72" x2="72" y2="104"/><g class="an"><line x1="60" y1="44" x2="34" y2="42"/><line x1="60" y1="44" x2="86" y2="42"/><circle class="bell" cx="31" cy="42" r="5.5"/><circle class="bell" cx="89" cy="42" r="5.5"/></g>';
+    case 'curl': return '<circle class="hd" cx="60" cy="24" r="9"/><line x1="60" y1="33" x2="60" y2="72"/><line x1="60" y1="72" x2="48" y2="104"/><line x1="60" y1="72" x2="72" y2="104"/><line x1="60" y1="44" x2="50" y2="66"/><line x1="60" y1="44" x2="70" y2="66"/><g class="an"><line x1="50" y1="66" x2="56" y2="48"/><line x1="70" y1="66" x2="64" y2="48"/><circle class="bell" cx="57" cy="46" r="4.5"/><circle class="bell" cx="63" cy="46" r="4.5"/></g>';
+    case 'squat': return '<g class="an"><circle class="hd" cx="60" cy="32" r="9"/><line x1="60" y1="41" x2="60" y2="66"/><line x1="60" y1="48" x2="82" y2="52"/><line x1="60" y1="66" x2="44" y2="74"/><line x1="60" y1="66" x2="76" y2="74"/><line x1="44" y1="74" x2="44" y2="104"/><line x1="76" y1="74" x2="76" y2="104"/></g>';
+    case 'hinge': return '<line x1="64" y1="68" x2="60" y2="104"/><line x1="64" y1="68" x2="74" y2="104"/><g class="an"><circle class="hd" cx="40" cy="46" r="9"/><line x1="47" y1="50" x2="64" y2="68"/><line x1="52" y1="54" x2="49" y2="80"/><circle class="bell" cx="48" cy="84" r="5"/></g>';
+    case 'pull': return '<line x1="36" y1="18" x2="84" y2="18"/><g class="an"><line x1="60" y1="40" x2="49" y2="20"/><line x1="60" y1="40" x2="71" y2="20"/><circle class="hd" cx="60" cy="49" r="9"/><line x1="60" y1="58" x2="60" y2="84"/><line x1="60" y1="84" x2="52" y2="102"/><line x1="60" y1="84" x2="68" y2="102"/></g>';
+    case 'core': return '<g class="an"><circle class="hd" cx="92" cy="56" r="8"/><line x1="86" y1="60" x2="34" y2="74"/><line x1="40" y1="70" x2="40" y2="94"/><line x1="34" y1="94" x2="48" y2="94"/><line x1="36" y1="76" x2="18" y2="94"/></g>';
+    default: return '<g class="an"><circle class="hd" cx="60" cy="24" r="9"/><line x1="60" y1="33" x2="60" y2="70"/><line x1="60" y1="44" x2="44" y2="64"/><line x1="60" y1="44" x2="76" y2="64"/></g><line x1="60" y1="70" x2="48" y2="104"/><line x1="60" y1="70" x2="72" y2="104"/>';
+  }
+}
+function _exAnim(name){
+  const p=_exPattern(name);
+  return `<div class="ex-anim" data-p="${p}" aria-hidden="true"><svg viewBox="0 0 120 120" class="ex-fig">${_exPose(p)}</svg></div>`;
+}
+
 /* ════════════ EXERCISE hero (mockup) ════════════ */
 function _exReadiness(){
   let hrs=0;try{const r=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));if(r)hrs=r.h||0;}catch(e){}
@@ -9110,6 +9169,43 @@ function _firstLever(r){
   if(bio===top)return {title:'Steady the body\'s fuel first',body:'A lot of the load here is physical — blood-sugar swings, short sleep, or food quality. Anchor protein at breakfast, protect the 10pm window, and the nervous system has far less to fight. Body steadiness comes before mindset work.'};
   return {title:'Protect your access to calm',body:'You have some capacity to settle — let\'s strengthen it. Small daily practices that bring a feeling of safety (connection, nature, slow breath) widen the window so the harder days don\'t tip you over.'};
 }
+
+/* ════════════ PREVIEW SANDBOX: seed sample data + banner ════════════ */
+function _mfdnBanner(){
+  if(document.getElementById('mfdn-banner'))return;
+  const b=document.createElement('div');
+  b.id='mfdn-banner';
+  b.textContent='Preview · sample data — not connected to your account';
+  b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sb,0px) + 70px);max-width:92%;white-space:nowrap;background:var(--text);color:#f4f1ea;font-size:11px;font-weight:600;padding:6px 14px;border-radius:999px;z-index:250;opacity:.9;font-family:var(--font-sans);pointer-events:none;box-shadow:0 4px 14px rgba(66,76,87,.25)';
+  document.body.appendChild(b);
+}
+function _initPreviewSandbox(){
+  if(typeof PREVIEW_SANDBOX==='undefined' || !PREVIEW_SANDBOX) return;
+  try{
+    if(!lsGet('_mfdnSeed','')){
+      // Seed ONLY if this isolated copy has no profile yet — never clobber existing local data.
+      if(!lsGet('_userProfile','')){
+        lsSet('_userProfile',JSON.stringify({name:'Preview',goal:'steady energy',bodyType:'mesomorph',sleep:'fair',stress:'high'}));
+        lsSet('_userTargets',JSON.stringify({train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}}));
+        lsSet('_onboardDone','1');
+        const today=(typeof dk==='function')?dk():new Date().toISOString().slice(0,10);
+        lsSet('fl_'+today,JSON.stringify([
+          {name:'Eggs & avocado toast',emoji:'🥚',cat:'breakfast',p:28,c:30,f:22,k:512,ts:Date.now()-21600000,moodAfter:['Content']},
+          {name:'Chicken & rice bowl',emoji:'🍗',cat:'lunch',p:52,c:58,f:18,k:640,ts:Date.now()-7200000}
+        ]));
+        lsSet('wa_'+today,'56');
+        lsSet('rest_'+today,JSON.stringify({h:6.67,bed:'23:18',wake:'06:42'}));
+        lsSet('_supps_plan',JSON.stringify([{id:'s1',name:'Vitamin D + K2',dose:'1 cap',slot:'morning'},{id:'s2',name:'Magnesium glycinate',dose:'2 caps',slot:'evening'}]));
+      }
+      lsSet('_mfdnSeed','1');
+      try{if(typeof checkOnboarding==='function')checkOnboarding();}catch(e){}
+      try{if(typeof initHeader==='function')initHeader();}catch(e){}
+      try{if(typeof refresh==='function')refresh();}catch(e){}
+    }
+  }catch(e){}
+  _mfdnBanner();
+}
+try{_initPreviewSandbox();}catch(e){}
 </script>
 </body>
 </html>
