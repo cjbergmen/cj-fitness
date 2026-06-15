@@ -531,6 +531,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-supps"></div>
     <div class="page" id="page-detective"></div>
     <div class="page" id="page-summary"></div>
+    <div class="page" id="page-journey"></div>
   </div>
   <div id="nav">
     <button class="nb" id="nb-food" onclick="goPage('food')">
@@ -1037,6 +1038,7 @@ function fbSyncSettings(){
     try { const ut=lsGet('_userTargets',''); if(ut) settings.userTargets=JSON.parse(ut); } catch(e){}
     try { const up=lsGet('_userProfile',''); if(up) settings.userProfile=JSON.parse(up); } catch(e){}
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
+    try { const js=lsGet('_journeyStart',''); if(js) settings.journeyStart=js; } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
     try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
@@ -1112,6 +1114,7 @@ async function fbPullAll(){
         if(s.userTargets) lsSet('_userTargets', JSON.stringify(s.userTargets));
         if(s.userProfile) lsSet('_userProfile', JSON.stringify(s.userProfile));
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
+        if(s.journeyStart) lsSet('_journeyStart', s.journeyStart);
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
         if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
@@ -2522,7 +2525,7 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journey:'My Journey'};
 function goPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
@@ -2544,6 +2547,7 @@ function render(p){
   else if(p==='supps')rSupps();
   else if(p==='detective')rDetective();
   else if(p==='summary')rDressSummary();
+  else if(p==='journey')rJourney();
 }
 function refresh(){render(curPage)}
 
@@ -8708,6 +8712,7 @@ if('serviceWorker' in navigator){
       <button class="dr-i" onclick="drawerGo('detective')"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><div>Health Detective<small>Ask anything about your story</small></div></button>
       <button class="dr-i" onclick="drawerGo('assess')"><span class="ic" style="background:rgba(122,154,171,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H5a1 1 0 0 0-1 1v8h5zM14 3h-4a1 1 0 0 0-1 1v16h5zM19 7h-4v13h5v-12a1 1 0 0 0-1-1z"/></svg></span><div>Assessments<small>Which systems are working hardest</small></div></button>
       <button class="dr-i" onclick="drawerGo('progress')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12V7M12 12l3.5 3.5"/></svg></span><div>Progress &amp; Weekly Review<small>Scores, trends, this week's focus</small></div></button>
+      <button class="dr-i" onclick="drawerGo('journey')"><span class="ic" style="background:rgba(183,186,167,.3)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6d7868" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5m0 14c4-3 8 1 12-2m-12-9c4-3 8 1 12-2v9"/></svg></span><div>My Journey<small id="dr-journey-sub">Your 90-day program</small></div></button>
       <button class="dr-i" onclick="drawerDressSummary()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg></span><div>My DRESS Summary<small>Your whole program, one page</small></div></button>
       <button class="dr-i" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
     </div>
@@ -8727,8 +8732,13 @@ function openDrawer(){
     let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
     document.getElementById('dr-name').textContent=p.name?p.name:'Your story';
     const st=lsGet('_journeyStart','');
-    if(st){const days=Math.max(1,Math.floor((Date.now()-new Date(st).getTime())/86400000)+1);
-      document.getElementById('dr-sub').textContent='Day '+days+' of your journey';}
+    if(st){
+      const day=(typeof _journeyDay==='function')?_journeyDay():Math.max(1,Math.floor((Date.now()-new Date(st).getTime())/86400000)+1);
+      const idx=(typeof _journeyPhaseIdx==='function')?_journeyPhaseIdx():0;
+      const phName=(typeof JOURNEY_PHASES!=='undefined'&&JOURNEY_PHASES[idx])?JOURNEY_PHASES[idx].name:'';
+      document.getElementById('dr-sub').textContent='Day '+day+(phName?' · '+phName+' phase':'');
+      const js=document.getElementById('dr-journey-sub'); if(js)js.textContent='Day '+day+(phName?' · '+phName:'');
+    }
   }catch(e){}
   document.getElementById('drawer-ov').classList.add('open');
 }
@@ -9327,6 +9337,76 @@ function rDressSummary(){
   h+=`<button class="btn btn-g btn-f" style="margin-top:4px" onclick="goPage('detective')">Ask the Detective about your plan</button>
   </div>`;
   document.getElementById('page-summary').innerHTML=h;
+}
+
+/* ════════════ 90-DAY JOURNEY (auto by time + safety gate) ════════════ */
+const JOURNEY_PHASES=[
+  {key:'relief',name:'Relief',sub:'Weeks 1–3',body:'Quick wins on your loudest complaints — calm the worst symptoms first (sleep, digestion, energy, cravings) to build trust and momentum.',focus:'Pick the one thing bothering you most and ease it this week.'},
+  {key:'correction',name:'Correction',sub:'The ~90-day middle',body:'Rebuild reserves across all five pillars — steady blood sugar, real sleep, movement matched to recovery, a daily stress practice. This is the heart of the journey.',focus:'Consistency over intensity. Small, repeatable wins beat heroic effort.'},
+  {key:'deeper',name:'Deeper work',sub:'After foundations hold',body:'Targeted gut and deeper terrain work, paced low and slow. This stays locked until your foundations are steady — on purpose. It’s safety, not a gimmick.',focus:'One change at a time. Support before challenge.'},
+  {key:'maintenance',name:'Maintenance',sub:'Sustain & re-check',body:'Fewer supports, durable habits, periodic re-checks. Every couple of months, take a week off supplements and notice how you feel.',focus:'Protect what’s working; re-assess every 6–12 weeks.'}
+];
+function _jkey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _journeyStartDate(){
+  let s=lsGet('_journeyStart','');
+  if(!s){ s=(typeof dk==='function')?dk():new Date().toISOString().slice(0,10); lsSet('_journeyStart',s); try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){} }
+  return s;
+}
+function _journeyDay(){ const s=_journeyStartDate(); const ms=Date.now()-new Date(s+'T12:00:00').getTime(); return Math.max(1,Math.floor(ms/86400000)+1); }
+function _journeyGate(){
+  const POS=(typeof CK_POS_MOODS!=='undefined')?CK_POS_MOODS:['Calm','Content','Energized'];
+  let energyDays=0;
+  for(let i=0;i<14;i++){const d=new Date();d.setDate(d.getDate()-i);let log=[];try{log=JSON.parse(lsGet('fl_'+_jkey(d),'[]'))||[];}catch(e){}
+    if(log.some(e=>{const ma=Array.isArray(e.moodAfter)?e.moodAfter:(e.moodAfter?[e.moodAfter]:[]);return ma.some(m=>POS.includes(m));}))energyDays++;}
+  let elimDays=0;
+  for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);if(lsGet('elim_'+_jkey(d),''))elimDays++;}
+  let titrOk=true;try{const t=JSON.parse(lsGet('_supp_titr','null'));if(t&&t.status==='hold')titrOk=false;}catch(e){}
+  const c1=energyDays>=12,c2=elimDays>=5,c3=titrOk;
+  return {energyDays,elimDays,titrOk,c1,c2,c3,ready:[c1,c2,c3].filter(Boolean).length,met:c1&&c2&&c3};
+}
+function _journeyPhaseIdx(){ const day=_journeyDay(); const g=_journeyGate(); if(day<=21)return 0; if(day<=90)return 1; if(g.met)return 2; return 1; }
+function logElimToday(){ const k='elim_'+((typeof dk==='function')?dk():new Date().toISOString().slice(0,10)); lsSet(k,lsGet(k,'')?'':'1'); rJourney(); }
+function rJourney(){
+  const day=_journeyDay(),week=Math.ceil(day/7),idx=_journeyPhaseIdx(),ph=JOURNEY_PHASES[idx],g=_journeyGate();
+  const todayElim=!!lsGet('elim_'+((typeof dk==='function')?dk():''),'');
+  let h=`<div style="padding:0 0 24px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <button onclick="goPage('today')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0">←</button>
+      <div style="font-size:16px;font-weight:700">My Journey</div>
+    </div>
+    <div class="fdn-focus" style="margin-bottom:14px">
+      <span class="kicker">Day ${day} · Week ${week}</span>
+      <h3>${ph.name}</h3>
+      <p>${ph.body}</p>
+      <div style="margin-top:11px;font-size:12px;color:#c8cdd2"><b style="color:#f4f1ea">This phase:</b> ${ph.focus}</div>
+    </div>`;
+  h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Your 90-day arc</span><div style="margin-top:8px">`;
+  JOURNEY_PHASES.forEach((p,i)=>{
+    const state=i<idx?'done':(i===idx?'now':'next');
+    const locked=(p.key==='deeper'&&!g.met&&idx<2);
+    const dot=state==='done'?'var(--purple)':(state==='now'?'var(--green)':'var(--border)');
+    h+=`<div style="display:flex;gap:12px;padding:9px 0;${i?'border-top:1px solid var(--border)':''}">
+      <div style="width:13px;height:13px;border-radius:50%;background:${dot};flex:none;margin-top:4px"></div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:${state==='next'?'var(--sub)':'var(--text)'}">${p.name}${state==='now'?' <span style="font-size:10px;color:var(--green);font-weight:800;text-transform:uppercase;letter-spacing:.06em">· now</span>':''}${locked?' <span style="font-size:10px;color:var(--sub)">· locked</span>':''}</div>
+        <div style="font-size:11.5px;color:var(--sub)">${p.sub}</div>
+      </div></div>`;
+  });
+  h+=`</div></div>`;
+  if(idx<2){
+    const cond=(ok,label,detail)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border)">
+      <div class="chk-box ${ok?'on':''}" style="width:20px;height:20px">${ok?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${label}</div><div style="font-size:11px;color:var(--sub)">${detail}</div></div></div>`;
+    h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Deeper work unlocks when foundations hold</span>
+      <div style="font-size:13px;color:var(--sub);line-height:1.5;margin:6px 0 2px">${g.ready} of 3 ready — this gate exists for safety, so deeper gut work only begins once your body is steady.</div>
+      ${cond(g.c1,'Steady energy',g.energyDays+' of last 14 days with a positive post-meal check-in')}
+      ${cond(g.c2,'Daily elimination',g.elimDays+' of last 7 days logged')}
+      ${cond(g.c3,'No active supplement reaction',g.titrOk?'No titration on hold':'A supplement is held after an off reaction')}
+      <button class="btn ${todayElim?'btn-s':'btn-g'} btn-f" style="margin-top:11px;${todayElim?'color:var(--text)':''}" onclick="logElimToday()">${todayElim?'Elimination logged today — tap to undo':'Log today’s elimination'}</button>
+    </div>`;
+  }
+  h+=`<button class="btn btn-s btn-f" style="margin-top:4px;color:var(--text)" onclick="goPage('detective')">Ask the Detective about this phase</button></div>`;
+  document.getElementById('page-journey').innerHTML=h;
 }
 
 /* ════════════ PREVIEW SANDBOX: seed sample data + banner ════════════ */
