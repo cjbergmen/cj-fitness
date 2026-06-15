@@ -989,27 +989,19 @@ async function fbPullAll(){
         if(s.assessGut) lsSet('_assess_gut_result', JSON.stringify(s.assessGut));
         if(s.assessAa) lsSet('_assess_aa_result', JSON.stringify(s.assessAa));
         if(s.foodLib && s.foodLib.length) {
-          const localLib = getLib();
-          // Merge: start with cloud items, then add local items not already present
-          // Deduplicate by BOTH id and name to prevent same-food accumulating multiple entries
-          const merged = [...s.foodLib];
-          const mergedIds = new Set(merged.map(x=>x.id));
-          const mergedNames = new Set(merged.map(x=>(x.n||'').toLowerCase().trim()));
-          localLib.forEach(localItem => {
-            const lName = (localItem.n||'').toLowerCase().trim();
-            if(!mergedIds.has(localItem.id) && !mergedNames.has(lName)) {
-              merged.push(localItem);
-              mergedIds.add(localItem.id);
-              mergedNames.add(lName);
-            }
-          });
-          lsSet('_foodlib', JSON.stringify(merged));
+          // Cloud is the source of truth — use the cloud library EXACTLY as stored.
+          // No client-side merge/recompute, so categories can never drift by version.
+          lsSet('_foodlib', JSON.stringify(s.foodLib));
+          // One-time safety backup of the authoritative cloud library (additive field).
+          if(!s.foodLibBackupV2 && fbDb && fbUser){
+            try{ fbDb.collection('users').doc(fbUser.uid).set({settings:{foodLibBackupV2:s.foodLib, foodLibBackupAt:Date.now()}},{merge:true}); }catch(e){}
+          }
         }
       }
     }
     // Guard: if auth changed mid-pull, abort — prevents writing wrong user's settings to Firebase
     if(!fbUser || fbUser.uid !== uid) { console.warn('[fbPullAll] auth changed mid-pull, aborting post-pull actions'); _fbSyncing = false; return false; }
-    importHistoryToLib();
+    // (library history-import disabled — cloud library is authoritative)
     refresh();
     if(curPage!=='workout')render('workout');
     // Auto-generate routine for users who have profile data but no saved routine
@@ -6766,9 +6758,12 @@ migrateUTCData();
 initHeader();
 rToday();
 initLib();
-importHistoryToLib();
-migrateLibCategories();
-restoreLibCategories();
+// CLOUD IS THE SOURCE OF TRUTH FOR THE FOOD LIBRARY. The old load-time rebuild/
+// migrate/restore routines recomputed categories and pushed them back, causing
+// version drift and the category-flattening incident (June 13). They no longer
+// auto-run — the library is whatever the cloud holds, changed only by explicit
+// user edits (Settings → "Import Foods from History" still works on demand).
+// importHistoryToLib();  migrateLibCategories();  restoreLibCategories();
 autoRestoreIfEmpty();
 // Only check onboarding at startup if Firebase isn't configured — otherwise
 // the onAuthStateChanged handler calls checkOnboarding() after fbPullAll() finishes,

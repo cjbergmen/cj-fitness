@@ -464,6 +464,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-row small{font-size:11px;color:var(--sub)}
 .mk-link{background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;padding:0}
 .mk-q{font-family:var(--font-serif);font-size:19px;font-weight:500;margin-top:4px}
+.mk-water-btn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:9px 0;font-size:12.5px;font-weight:700;color:var(--blue);cursor:pointer;text-align:center}
+.mk-water-btn:active{opacity:.7}
+/* swipe-to-archive rows in the food library */
+.lib-sw{position:relative;border-radius:12px;overflow:hidden;margin-bottom:8px;background:var(--green)}
+.lib-sw-bg{position:absolute;top:0;right:0;bottom:0;width:112px;display:flex;align-items:center;justify-content:center;gap:6px;color:#fff;font-size:12.5px;font-weight:700;pointer-events:none}
+.lib-sw-fg{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;gap:10px;padding:10px 12px;transition:transform .2s ease;will-change:transform;cursor:pointer}
 
 /* ── exercise how-to: animated blue silhouette ── */
 .ex-anim{display:flex;justify-content:center;align-items:center;background:rgba(122,154,171,.10);border:1px solid var(--border);border-radius:14px;padding:6px 0;margin-bottom:12px}
@@ -524,6 +530,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-rest"></div>
     <div class="page" id="page-supps"></div>
     <div class="page" id="page-detective"></div>
+    <div class="page" id="page-summary"></div>
   </div>
   <div id="nav">
     <button class="nb" id="nb-food" onclick="goPage('food')">
@@ -2515,7 +2522,7 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary'};
 function goPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
@@ -2536,6 +2543,7 @@ function render(p){
   else if(p==='rest')rRest();
   else if(p==='supps')rSupps();
   else if(p==='detective')rDetective();
+  else if(p==='summary')rDressSummary();
 }
 function refresh(){render(curPage)}
 
@@ -3098,10 +3106,19 @@ function rRecovery(){
     <h3 class="mk-q">How's your system right now?</h3>
     <div class="mood-row">${_states.map(([k,l])=>`<button class="${_ss===k?'sel':''}" onclick="setStressState('${k}')">${l}</button>`).join('')}</div>
     <p style="font-size:11.5px;color:var(--sub);margin-top:9px;line-height:1.45">Your answer shapes today's suggestion — wired days get grounding, drained days get gentleness.</p></div>`;
-  if(_ss && typeof STRESS_SUGGEST!=='undefined' && STRESS_SUGGEST[_ss]){
-    const sg=STRESS_SUGGEST[_ss];
-    h += `<div class="fdn-focus" style="margin-bottom:12px"><span class="kicker">${sg.k}</span><h3>${sg.t}</h3><p>${sg.b}</p>
-      <button class="btn" style="margin-top:11px;background:var(--purple);color:var(--text);border:none" onclick="beginSuggested()">Begin a practice</button></div>`;
+  if(_ss){
+    const sg=(typeof STRESS_SUGGEST!=='undefined'&&STRESS_SUGGEST[_ss])?STRESS_SUGGEST[_ss]:{};
+    const act=(typeof _stressPick==='function')?_stressPick(_ss):null;
+    if(act){
+      h += `<div class="fdn-focus" style="margin-bottom:14px;padding:18px">
+        <span class="kicker">Today's practice · for feeling ${_ss}</span>
+        <h3 style="font-size:22px;margin:7px 0 5px">${act.n}</h3>
+        <p>${sg.b||act.tag||''}</p>
+        <div style="font-size:11.5px;color:#c8cdd2;margin-top:8px">${act.dur||''}${act.dur&&act.tag?' · ':''}${act.tag||''}</div>
+        <button class="btn" style="margin-top:14px;background:var(--purple);color:var(--text);border:none" onclick="setNSExpand('${act.id}')">Begin this practice</button></div>`;
+    } else if(sg.t){
+      h += `<div class="fdn-focus" style="margin-bottom:14px;padding:18px"><span class="kicker">${sg.k||'Suggested'}</span><h3>${sg.t}</h3><p>${sg.b}</p></div>`;
+    }
   }
   h += `<div class="ct" style="padding:4px 3px 8px">More practices</div>`;
 
@@ -3407,12 +3424,24 @@ let _aiPlanLoading = false;
 
 // ── ASSESSMENT FUNCTIONS ──────────────────────────────────────────────────────
 function rAssess(){
+  if(_assessPage === 'progress') return rProgressPage();
   if(_assessPage === 'hub') return rAssessHub();
   if(_assessPage === 'ns') return rAssessForm(ASSESS_NS);
   if(_assessPage === 'gut') return rAssessForm(ASSESS_GUT);
   if(_assessPage === 'aa') return rAssessForm(ASSESS_AA);
   if(_assessPage === 'insights') return rAssessInsights();
   return rAssessHub();
+}
+function rProgressPage(){
+  try{setTimeout(maybeAutoWeekly,400);}catch(e){}
+  return `<div style="padding:0 0 20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <button onclick="goPage('today')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1">←</button>
+      <div style="font-size:16px;font-weight:700">Progress &amp; Weekly Review</div>
+    </div>
+    ${rProgressCard()}
+    ${rAIWeeklyCard()}
+  </div>`;
 }
 
 // ── PROGRESS DASHBOARD v3 (adherence + trend + feature-availability windows) ──
@@ -3763,8 +3792,6 @@ function rAssessHub(){
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
       <span>These aren't tests you pass or fail. They show <b>which of your systems are working hardest right now</b> — and where the healing opportunities are. Symptoms are the end of the story, not the beginning. Re-check every 6&ndash;12 weeks and watch your story change.</span>
     </div>
-    ${rProgressCard()}
-    ${rAIWeeklyCard()}
     ${anyDone ? `<div style="background:var(--surface);border:1px solid var(--green);border-radius:var(--r);padding:14px;margin-bottom:14px;cursor:pointer" onclick="_assessPage='insights';document.getElementById('page-assess').innerHTML=rAssess()">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
@@ -4480,22 +4507,56 @@ function setFoodModalTab(tab){
   document.getElementById('food-lib-wrap').style.display=tab==='library'?'':'none';
   if(tab==='library'){rFoodModalLib();setTimeout(()=>{const q=document.getElementById('fml-q');if(q)q.focus();},200);}
 }
+let _libArchived=false;
+const _ARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v3H3zM5 10v9h14v-9M9 13h6"/></svg>';
 function rFoodModalLib(){
   const q=(document.getElementById('fml-q').value||'').toLowerCase().trim();
-  const lib=getLib().filter(it=>it.cat!=='archived');
-  const filtered=q?lib.filter(it=>it.n.toLowerCase().includes(q)):lib;
+  const all=getLib();
+  const archived=all.filter(it=>it.cat==='archived');
+  const active=all.filter(it=>it.cat!=='archived');
   const el=document.getElementById('fml-list');
   if(!el)return;
-  if(!filtered.length){el.innerHTML='<div style="font-size:13px;color:var(--sub);padding:12px 0;text-align:center">No items found</div>';return;}
-  el.innerHTML=filtered.map(it=>{
+  const source=_libArchived?archived:active;
+  const filtered=q?source.filter(it=>it.n.toLowerCase().includes(q)):source;
+  // header / archived-folder toggle
+  let head='';
+  if(_libArchived){
+    head=`<div style="display:flex;align-items:center;gap:8px;padding:2px 2px 10px">
+      <button onclick="_libArchived=false;rFoodModalLib()" style="background:none;border:none;color:var(--green);font-size:13px;font-weight:700;cursor:pointer;padding:0">‹ Back to library</button>
+      <span style="font-size:12px;color:var(--sub);margin-left:auto">Archived · ${archived.length}</span></div>`;
+  } else if(archived.length){
+    head=`<button onclick="_libArchived=true;rFoodModalLib()" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:10px;cursor:pointer;color:var(--text);font-size:13px;font-weight:600">${_ARCH_SVG}Archived<span style="margin-left:auto;color:var(--sub)">${archived.length} ›</span></button>`;
+  }
+  if(!filtered.length){
+    el.innerHTML=head+`<div style="font-size:13px;color:var(--sub);padding:12px 0;text-align:center">${_libArchived?'No archived items':(q?'No items found':'Your library is empty')}</div>`;
+    return;
+  }
+  // ── ARCHIVED VIEW: list with Restore ──
+  if(_libArchived){
+    el.innerHTML=head+filtered.map(it=>{
+      const sid=it.id.replace(/['"]/g,'');
+      const macroLine=it.perGram?`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal /100g`:`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal`;
+      return`<div class="lib-pk-item" style="background:var(--surface2);border-radius:12px;margin-bottom:8px;padding:10px 12px">
+        <div class="lib-pk-em">${it.e||'🍽️'}</div>
+        <div style="flex:1;min-width:0"><div class="lib-pk-nm">${it.n}</div><div class="lib-pk-mc">${macroLine}</div></div>
+        <button onclick="fmlRestore('${sid}')" style="background:var(--green);color:#fff;border:none;border-radius:14px;font-size:12px;font-weight:700;padding:8px 13px;cursor:pointer;white-space:nowrap;flex:none">Restore</button>
+      </div>`;
+    }).join('');
+    return;
+  }
+  // ── ACTIVE VIEW: swipe-left to archive ──
+  el.innerHTML=head+filtered.map(it=>{
     const sid=it.id.replace(/['"]/g,'');
     const macroLine=it.perGram?`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal <span style="color:var(--sub)">/100g</span>`:`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal`;
-    return`<div class="lib-pk-item" style="border-radius:var(--rs) var(--rs) 0 0;margin-bottom:0" onclick="fmlExpand('${sid}')">
-      <div class="lib-pk-em">${it.e||'🍽️'}</div>
-      <div style="flex:1;min-width:0"><div class="lib-pk-nm">${it.n}</div><div class="lib-pk-mc">${macroLine}</div></div>
-      <div style="font-size:18px;color:var(--sub);padding-left:6px">›</div>
+    return`<div class="lib-sw">
+      <div class="lib-sw-bg">${_ARCH_SVG}Archive</div>
+      <div class="lib-sw-fg" data-sid="${sid}" onclick="fmlExpand('${sid}')">
+        <div class="lib-pk-em">${it.e||'🍽️'}</div>
+        <div style="flex:1;min-width:0"><div class="lib-pk-nm">${it.n}</div><div class="lib-pk-mc">${macroLine}</div></div>
+        <button onclick="event.stopPropagation();fmlArchive('${sid}')" title="Archive" style="background:none;border:none;color:var(--sub);padding:4px 6px;cursor:pointer;flex:none">${_ARCH_SVG}</button>
+      </div>
     </div>
-    <div id="fml-exp-${sid}" style="display:none;padding:8px 12px 12px;background:var(--surface2);border-radius:0 0 var(--rs) var(--rs);margin-bottom:8px">
+    <div id="fml-exp-${sid}" style="display:none;padding:8px 12px 12px;background:var(--surface2);border-radius:0 0 var(--rs) var(--rs);margin:-6px 0 8px">
       ${it.perGram?`
         <div style="font-size:12px;color:var(--sub);margin-bottom:7px">Per 100g — enter your portion weight below</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -4506,6 +4567,30 @@ function rFoodModalLib(){
       :`<button class="btn btn-g btn-f btn-sm" onclick="fmlLogDirect('${sid}')">Log It</button>`}
     </div>`;
   }).join('');
+  _fmlSwipeInit();
+}
+function fmlArchive(sid){
+  const lib=getLib();const it=lib.find(x=>x.id===sid||x.id.replace(/['"]/g,'')===sid);if(!it)return;
+  if(it.cat!=='archived'){ it.acat=it.cat||'custom'; it.cat='archived'; }
+  putLib(lib);try{fbSyncSettings();}catch(e){}
+  rFoodModalLib();
+  if(typeof showToast==='function')showToast('Archived — find it in the Archived folder');
+}
+function fmlRestore(sid){
+  const lib=getLib();const it=lib.find(x=>x.id===sid||x.id.replace(/['"]/g,'')===sid);if(!it)return;
+  it.cat=it.acat||'custom'; delete it.acat;
+  putLib(lib);try{fbSyncSettings();}catch(e){}
+  rFoodModalLib();
+  if(typeof showToast==='function')showToast('Restored to your library');
+}
+function _fmlSwipeInit(){
+  const list=document.getElementById('fml-list');
+  if(!list||list._swBound)return;
+  list._swBound=true;
+  let fg=null,x0=0,dx=0;
+  list.addEventListener('touchstart',e=>{ fg=e.target.closest('.lib-sw-fg'); if(fg){x0=e.touches[0].clientX;dx=0;fg.style.transition='';} },{passive:true});
+  list.addEventListener('touchmove',e=>{ if(!fg)return; dx=e.touches[0].clientX-x0; if(dx<0)fg.style.transform='translateX('+Math.max(dx,-112)+'px)'; },{passive:true});
+  list.addEventListener('touchend',()=>{ if(!fg)return; const el=fg; fg=null; el.style.transition='transform .2s ease'; if(dx<-60){ el.style.transform='translateX(-100%)'; const sid=el.dataset.sid; setTimeout(()=>fmlArchive(sid),160);} else { el.style.transform='translateX(0)'; } });
 }
 function fmlExpand(sid){
   document.querySelectorAll('[id^="fml-exp-"]').forEach(el=>{if(el.id!=='fml-exp-'+sid)el.style.display='none';});
@@ -8650,12 +8735,13 @@ function openDrawer(){
 function closeDrawer(){document.getElementById('drawer-ov').classList.remove('open');}
 function drawerGo(p){
   closeDrawer();
-  if(p==='progress'){goPage('assess');return;}
+  if(p==='progress'){ try{_assessPage='progress';}catch(e){} goPage('assess'); return; }
+  if(p==='assess'){ try{_assessPage='hub';}catch(e){} goPage('assess'); return; }
   goPage(p);
 }
 function drawerDressSummary(){
   closeDrawer();
-  showToast('Your DRESS Summary is coming in the next build');
+  goPage('summary');
 }
 
 /* ════════════ REST TAB ════════════ */
@@ -8715,13 +8801,18 @@ function rRest(){
     <h3>In bed by 10:00 tonight</h3>
     <p>The hours before midnight do the heaviest lifting for recovery, hormones, and tomorrow's energy. Two hours of sleep before midnight are worth more than four after.</p></div>`;
   // wind-down
-  h+=`<div class="card"><span class="kicker">Tonight's wind-down</span><div style="margin-top:8px">`;
-  WINDDOWN.forEach(w=>{
-    h+=`<div class="chk-row" onclick="toggleWind('${w.k}')">
-      <div class="chk-box ${wind[w.k]?'on':''}">${wind[w.k]?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-      ${w.t}${w.s?`<small>${w.s}</small>`:''}</div>`;
-  });
-  h+=`</div></div>`;
+  // Wind-down checklist only appears in the evening (after 5pm) on today's view,
+  // when it's actually relevant — keeps the Rest tab clean during the day.
+  const _isToday=(typeof dk==='function')?(viewDate===dk()):true;
+  if(_isToday && new Date().getHours()>=17){
+    h+=`<div class="card"><span class="kicker">Tonight's wind-down</span><div style="margin-top:8px">`;
+    WINDDOWN.forEach(w=>{
+      h+=`<div class="chk-row" onclick="toggleWind('${w.k}')">
+        <div class="chk-box ${wind[w.k]?'on':''}">${wind[w.k]?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+        ${w.t}${w.s?`<small>${w.s}</small>`:''}</div>`;
+    });
+    h+=`</div></div>`;
+  }
   document.getElementById('page-rest').innerHTML=h;
 }
 
@@ -8808,7 +8899,7 @@ function rDiet(){
   let h=`<div class="card">
     <div class="mk-cals">
       <div class="mk-ring" style="background:conic-gradient(var(--green) 0 ${calPct}%, var(--surface3) ${calPct}% 100%)">
-        <div class="mk-ring-in"><b>${calLeft}</b><small>LEFT</small></div>
+        <div class="mk-ring-in"><b>${calLeft}</b><small>CAL LEFT</small></div>
       </div>
       <div style="flex:1">
         ${_mkMacro('Protein',m.p,t.p,'var(--green)')}
@@ -8855,10 +8946,15 @@ function rDiet(){
   // hydration + blood sugar
   const oz=(typeof getWater==='function')?getWater():0;
   const bs=_bsGet();const last=bs.length?bs[bs.length-1]:null;
-  h+=`<div class="card mk-row" onclick="goPage('water')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/></svg>
-      <div style="flex:1"><h4>Hydration · ${oz} oz</h4><div class="mk-mbar" style="margin-top:6px"><i style="width:${Math.min(100,pct(oz,t.w))}%;background:var(--blue)"></i></div></div>
-      <button class="mk-link" onclick="event.stopPropagation();addWater(8);rDiet()">+ 8 oz</button></div>`;
+  h+=`<div class="card">
+      <div style="display:flex;align-items:center;gap:12px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/></svg>
+        <div style="flex:1"><h4 style="font-size:13.5px;font-weight:700">Hydration · ${oz} / ${t.w||0} oz</h4><div class="mk-mbar" style="margin-top:6px"><i style="width:${Math.min(100,pct(oz,t.w))}%;background:var(--blue)"></i></div></div>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:11px">
+        ${[8,12,16,24].map(n=>`<button class="mk-water-btn" onclick="addWater(${n});rDiet()">+${n}</button>`).join('')}
+        <button class="mk-water-btn" style="color:var(--sub)" onclick="goPage('water')">More</button>
+      </div></div>`;
   h+=`<div class="card mk-row" onclick="addBS()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
       <div style="flex:1"><h4>Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></h4><small>${last?'Last: '+last.v+' mg/dL':'Target 80–90 before meals'}</small></div>
@@ -8928,6 +9024,13 @@ const STRESS_SUGGEST={
   foggy:{k:'Suggested for foggy',t:'Light and movement first',b:'Fog usually lifts faster with outdoor light and a short walk than with more caffeine. Ten minutes outside is the experiment.',cat:'rest'},
   drained:{k:'Suggested for drained',t:'Do less, gently',b:'Nothing left in the tank means the move is gentleness — warmth, rest, easy connection. Pushing harder digs the hole deeper.',cat:'rest'}
 };
+function _stressPick(state){
+  if(typeof NS_ACT==='undefined')return null;
+  const ids={wired:['extended-exhale','box-breath','phys-sigh'],drained:['yoga-nidra','body-scan','floor-time'],foggy:['orienting-walk','zone2-walk','five-senses'],steady:['box-breath','coherent-breath','gratitude']}[state]||[];
+  for(const id of ids){const a=NS_ACT.find(x=>x.id===id);if(a)return a;}
+  const cat={wired:'breathing',drained:'mindfulness',foggy:'movement',steady:'breathing'}[state];
+  return NS_ACT.find(x=>x.cat===cat)||NS_ACT[0]||null;
+}
 function setStressState(s){lsSet('stress_'+viewDate,s);try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}rRecovery();}
 function beginSuggested(){
   const s=lsGet('stress_'+viewDate,'steady');const cat=(STRESS_SUGGEST[s]||{}).cat;
@@ -9168,6 +9271,62 @@ function _firstLever(r){
   if(symp===top)return {title:'Daily grounding, in small doses',body:'Your system looks stuck in "on." The first lever is shifting toward rest-and-repair on purpose — long slow exhales, morning outdoor light, a few minutes of stillness — plus steadier blood sugar so the body has less to brace against.'};
   if(bio===top)return {title:'Steady the body\'s fuel first',body:'A lot of the load here is physical — blood-sugar swings, short sleep, or food quality. Anchor protein at breakfast, protect the 10pm window, and the nervous system has far less to fight. Body steadiness comes before mindset work.'};
   return {title:'Protect your access to calm',body:'You have some capacity to settle — let\'s strengthen it. Small daily practices that bring a feeling of safety (connection, nature, slow breath) widen the window so the harder days don\'t tip you over.'};
+}
+
+/* ════════════ DRESS SUMMARY (one-page program overview) ════════════ */
+function rDressSummary(){
+  let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
+  const name=p.name||'';
+  const goal=p.goal||'general wellness';
+  let ns=null;try{ns=JSON.parse(lsGet('_assess_ns_result','null'));}catch(e){}
+  const lever=(typeof _firstLever==='function'&&ns)?_firstLever(ns):null;
+  const t=(typeof getTgt==='function')?getTgt():{};
+  const m=(typeof getMacros==='function')?getMacros():{};
+  const dietLine=(t&&t.p)?`Protein ${Math.round(m.p||0)} / ${t.p}g · ${Math.round(m.k||0)} / ${t.k} cal today`:'Log meals to track your plate balance.';
+  let sleep=null;try{sleep=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));}catch(e){}
+  const restLine=(sleep&&sleep.h)?`Last sleep ${sleep.h}h · target ~8h`:'Log last night’s sleep on the Rest tab.';
+  const streak=(typeof _exStreak==='function')?_exStreak():0;
+  const exLine=streak>0?`${streak}-day streak · intensity matched to recovery`:'Movement matched to your current capacity.';
+  const ss=lsGet('stress_'+viewDate,'');
+  const stressLine=ss?`Today you feel ${ss} — a practice is suggested for you`:'Check in for today’s suggested practice.';
+  let supps=[];try{supps=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
+  let titr=null;try{titr=JSON.parse(lsGet('_supp_titr','null'));}catch(e){}
+  const suppLine=titr?`Titrating ${titr.name} (day ${titr.day||1}) · one at a time`:(supps.length?`${supps.length} in your routine · foundations first`:'Foundations before bottles — add when ready.');
+  let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress());if(fx&&fx.label)focus=fx.label;}}catch(e){}
+  const pillar=(label,line,page,iconPath,color)=>`<div class="mk-row" style="padding:11px 0;border-top:1px solid var(--border)" onclick="goPage('${page}')">
+    <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></div>
+    <div style="flex:1;min-width:0"><h4>${label}</h4><small>${line}</small></div>
+    <span style="color:var(--sub);margin-left:auto">›</span></div>`;
+  let h=`<div style="padding:0 0 24px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <button onclick="goPage('today')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0">←</button>
+      <div style="font-size:16px;font-weight:700">My DRESS Summary</div>
+    </div>
+    <div class="fdn-focus" style="margin-bottom:14px">
+      <span class="kicker">Your program at a glance</span>
+      <h3>${name?name+'’s story':'Your story'}</h3>
+      <p>Working toward ${goal}. Your whole program — the five daily pillars — on one page. Show it to a coach, a doctor, or just yourself.</p>
+    </div>`;
+  if(ns&&ns.pattern){
+    h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Systems under stress</span>
+      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${ns.pattern}</div>
+      ${lever?`<div style="font-size:13px;color:var(--sub);line-height:1.55"><b style="color:var(--text)">First lever:</b> ${lever.title} — ${lever.body}</div>`:''}</div>`;
+  } else {
+    h+=`<div class="card" onclick="_assessPage='hub';goPage('assess')" style="cursor:pointer"><div style="font-size:13px;color:var(--sub);line-height:1.55">Take the assessments to see which of your systems are working hardest — and your first lever.</div></div>`;
+  }
+  h+=`<div class="card"><span class="kicker" style="color:var(--sub)">The five daily pillars</span>
+    ${pillar('Diet',dietLine,'food','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>','var(--green)')}
+    ${pillar('Rest',restLine,'rest','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>','var(--blue)')}
+    ${pillar('Exercise',exLine,'workout','<path d="M3 12h4l3-7 4 14 3-7h4"/>','var(--green)')}
+    ${pillar('Stress',stressLine,'recovery','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>','var(--purple)')}
+    ${pillar('Supplements',suppLine,'supps','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','var(--green)')}
+  </div>`;
+  if(focus){
+    h+=`<div class="card" style="background:rgba(183,186,167,.18);border-color:var(--purple)"><span class="kicker" style="color:#6d7868">This week's focus</span><div style="font-size:14px;font-weight:700;margin-top:4px">${focus}</div></div>`;
+  }
+  h+=`<button class="btn btn-g btn-f" style="margin-top:4px" onclick="goPage('detective')">Ask the Detective about your plan</button>
+  </div>`;
+  document.getElementById('page-summary').innerHTML=h;
 }
 
 /* ════════════ PREVIEW SANDBOX: seed sample data + banner ════════════ */
