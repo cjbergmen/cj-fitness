@@ -890,6 +890,15 @@ function rSettingsModal(){
       ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()">⚠️ Reset My Account Data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan, and targets — both locally and in the cloud — and re-runs setup. Use this if your account shows someone else\'s data.</div>' : ''}
     </div>
     <div class="card" style="margin-bottom:10px">
+      <div class="ct">Health &amp; safety flags</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">These let the Health Detective and supplement guidance keep your doctor in the loop where it matters. Private to your account — tap any that apply to you.</div>
+      ${(()=>{
+        let f=[];try{f=JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){}
+        const opts=[['pregnant','Pregnant / nursing'],['cancer','Cancer (current or history)'],['ppi','Reflux meds, ulcer, or regular NSAIDs'],['antidepressant','Antidepressant / mood medication'],['bp','Blood pressure condition'],['virus','Latent virus (EBV, shingles, Lyme)'],['bloodthinner','Blood thinners / upcoming surgery'],['diabetes','Diabetes on medication'],['minor','Under 18']];
+        return '<div style="display:flex;flex-wrap:wrap;gap:7px">'+opts.map(([k,l])=>{const on=f.includes(k);return '<button onclick="toggleDetFlag(\''+k+'\')" style="font-size:12px;font-weight:600;padding:8px 12px;border-radius:999px;border:1.5px solid '+(on?'var(--green)':'var(--border)')+';background:'+(on?'rgba(171,108,82,.12)':'var(--surface2)')+';color:'+(on?'var(--green)':'var(--sub)')+';cursor:pointer">'+l+'</button>';}).join('')+'</div>';
+      })()}
+    </div>
+    <div class="card" style="margin-bottom:10px">
       <div class="ct">📦 Data Backup</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Export your logs to a file you can save, or import a backup to restore data.</div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -1037,6 +1046,7 @@ function fbSyncSettings(){
     try { const ut=lsGet('_userTargets',''); if(ut) settings.userTargets=JSON.parse(ut); } catch(e){}
     try { const up=lsGet('_userProfile',''); if(up) settings.userProfile=JSON.parse(up); } catch(e){}
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
+    try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
     try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
@@ -1112,6 +1122,7 @@ async function fbPullAll(){
         if(s.userTargets) lsSet('_userTargets', JSON.stringify(s.userTargets));
         if(s.userProfile) lsSet('_userProfile', JSON.stringify(s.userProfile));
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
+        if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
         if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
@@ -8836,6 +8847,16 @@ function startTitr(id){
 function rSupps(){
   const plan=_suppPlan();const taken=_suppTaken();const t=_titr();
   let h='';
+  // Safety banner — reflects the user's health flags so gating is visible on this tab
+  try{
+    const f=_detFlags();
+    if(f.length){
+      const labels=f.map(x=>(typeof DET_FLAG_LABELS!=='undefined'&&DET_FLAG_LABELS[x])?DET_FLAG_LABELS[x]:x);
+      h+=`<div class="fdn-chip" style="background:rgba(196,133,95,.14);border-color:#d8b2a0;color:#6e5145">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 9v4M12 17v.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        <span>Because of your health flags (${labels.join(', ')}), some supplements should go by your doctor first. The Health Detective will flag those and won't suggest them. Update anytime in Settings.</span></div>`;
+    }
+  }catch(e){}
   if(t){
     h+=`<div class="titr-card">
       <b>${t.name} — day ${t.day||1}${t.dose?' at '+t.dose:''}.</b> ${t.status==='hold'?"We're holding here while things settle — that's the system working, not a setback.":'Feeling fine? Tomorrow you can step up a little. Anything off, we hold here.'}
@@ -9117,6 +9138,14 @@ const OUT_DX_RX=/\byou (likely |probably |may |might )?have (a |an )?(thyroid (p
 
 const DET_FLAG_LABELS={pregnant:'pregnant or nursing',cancer:'cancer history',ppi:'reflux meds / ulcer history',antidepressant:'mood medication',bp:'blood pressure condition',virus:'latent viral history (EBV/HSV/Lyme)',bloodthinner:'blood thinners / upcoming surgery',diabetes:'diabetes on medication',minor:'under 18'};
 function _detFlags(){try{return JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){return [];}}
+function toggleDetFlag(k){
+  let f=[];try{f=JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){}
+  f=f.includes(k)?f.filter(x=>x!==k):f.concat(k);
+  lsSet('_detFlags',JSON.stringify(f));
+  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  try{if(typeof rSettingsModal==='function')rSettingsModal();}catch(e){}
+  try{if(typeof curPage!=='undefined'&&curPage==='supps'&&typeof rSupps==='function')rSupps();}catch(e){}
+}
 function _gatesNote(){
   const f=_detFlags();if(!f.length)return '';
   const map={
