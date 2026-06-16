@@ -2640,97 +2640,44 @@ function saveRoutineEditor(){
 
 // ── TODAY ─────────────────────────────────────────────────────────────────────
 function rToday(){
-  const m=getMacros(),t=getTgt(),w=getWater(),wo=getWO(),tr=isTrain();
-  let h='';
-  const done=isWODone();
-  // ── 1. Workout / Rest day card ────────────────────────────────────────────
-  // Single consistent .card surface across all three states (training,
-  // completed, rest). State is distinguished by the border color, not by
-  // background gradient or oversized layout. No emojis.
-  if(tr&&wo){
-    if(done){
-      h+=`<div class="card" onclick="goPage('workout')" style="cursor:pointer;border-color:var(--green)">
-        <div class="ct">Today's Workout</div>
-        <div style="font-size:17px;font-weight:700;color:var(--green)">${wo.name}</div>
-        <div style="font-size:12px;color:var(--sub);margin-top:4px">Workout complete</div>
-      </div>`;
-    } else {
-      h+=`<div class="card" onclick="goPage('workout')" style="cursor:pointer">
-        <div class="ct">Today's Workout</div>
-        <div style="font-size:17px;font-weight:700">${wo.name}</div>
-        <div style="font-size:12px;color:var(--sub);margin-top:4px">${(wo.ex||(wo.phases||[]).flatMap(p=>p.ex||[])).length} exercises${wo.pm?' + PM boost':''} · 45 min</div>
-      </div>`;
-    }
-  }else{
-    h+=`<div class="card">
-      <div class="ct">Today's Workout</div>
-      <div style="font-size:17px;font-weight:700">Rest Day</div>
-      <div style="font-size:12px;color:var(--sub);margin-top:4px">Focus on protein, hydration & recovery</div>
-    </div>`;
-  }
-  // ── 2. Quick Actions (moved up — sits right under workout card) ───────────
-  h+=`<div class="card"><div class="ct">Quick Actions</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-      <button class="btn btn-g btn-f" onclick="goPage('food');openFood()">+ Log Food</button>
-      <button class="btn btn-s btn-f" style="color:var(--blue)" onclick="goPage('water')">Hydrate</button>
-      <button class="btn btn-s btn-f" onclick="goPage('recovery')">Recovery</button>
-      <button class="btn btn-s btn-f" onclick="goPage('workout')">Workout</button>
-    </div></div>`;
-  // ── 3. Macros ─────────────────────────────────────────────────────────────
-  h+=`<div class="card">
-    <div class="ct">Macros Today</div>
-    <div class="mr" style="margin-bottom:12px">
-      <div class="mi"><div class="mv" style="color:var(--green)">${Math.round(m.p)}</div><div class="ml">Protein</div><div class="mt">/${t.p}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--orange)">${Math.round(m.c)}</div><div class="ml">Carbs</div><div class="mt">/${t.c}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--blue)">${Math.round(m.f)}</div><div class="ml">Fat</div><div class="mt">/${t.f}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--text)">${Math.round(m.k)}</div><div class="ml">Kcal</div><div class="mt">/${t.k}</div></div>
-    </div>
-    <div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:3px"><span>Protein</span><span>${Math.round(m.p)}/${t.p}g</span></div><div class="pw"><div class="pb" style="width:${pct(m.p,t.p)}%;background:var(--green)"></div></div></div>
-    <div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:3px"><span>Carbs</span><span>${Math.round(m.c)}/${t.c}g</span></div><div class="pw"><div class="pb" style="width:${pct(m.c,t.c)}%;background:var(--orange)"></div></div></div>
-    <div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:3px"><span>Fat</span><span>${Math.round(m.f)}/${t.f}g</span></div><div class="pw"><div class="pb" style="width:${pct(m.f,t.f)}%;background:var(--blue)"></div></div></div>
-    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-bottom:3px"><span>Calories</span><span>${Math.round(m.k)}/${t.k}</span></div><div class="pw"><div class="pb" style="width:${pct(m.k,t.k)}%;background:var(--text)"></div></div></div>
+  const m=getMacros(),t=getTgt(),wo=getWO(),tr=isTrain(),done=isWODone();
+  let prof={};try{prof=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
+  const hr=new Date().getHours();
+  const greet=hr<12?'Good morning':(hr<18?'Good afternoon':'Good evening');
+  const name=prof.name?(', '+String(prof.name).split(' ')[0]):'';
+  // ── pillar status lines ──
+  const calLeft=Math.max(0,Math.round((t.k||0)-(m.k||0)));
+  const dietLine=calLeft+' cal left · '+Math.round(m.p)+'/'+t.p+'g protein';
+  let sleep=null;try{sleep=JSON.parse(lsGet('rest_'+dk(),'null'));}catch(e){}
+  const restLine=(sleep&&sleep.h)?('Last night '+sleep.h+'h'):'Tap to log last night';
+  const exLine=tr?(wo?(done?(wo.name+' · done'):wo.name):'Training day'):'Rest day · recover';
+  const ss=lsGet('stress_'+dk(),'');
+  const stressLine=ss?('Feeling '+ss+' today'):'Check in on how you feel';
+  let plan=[],taken=[];try{plan=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
+  try{taken=JSON.parse(lsGet('supptk_'+dk(),'[]'))||[];}catch(e){}
+  const suppLine=plan.length?(taken.length+'/'+plan.length+' taken today'):'Foundations first';
+  const pillar=(label,line,page,icon,color)=>`<div class="mk-row" style="padding:12px 0;border-top:1px solid var(--border)" onclick="goPage('${page}')">
+    <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>
+    <div style="flex:1;min-width:0"><h4 style="font-size:14px;font-weight:700">${label}</h4><small style="font-size:11.5px;color:var(--sub)">${line}</small></div>
+    <span style="color:var(--sub);margin-left:auto">›</span></div>`;
+  let h=`<div class="fdn-focus" style="margin-bottom:14px">
+    <span class="kicker">${tr?'Training day':'Rest day'}</span>
+    <h3>${greet}${name}</h3>
+    <p>Your five daily pillars at a glance — tap any to dive in.</p></div>`;
+  h+=`<div class="card" style="padding:4px 15px">
+    ${pillar('Diet',dietLine,'food','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>','var(--green)')}
+    ${pillar('Rest',restLine,'rest','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>','var(--blue)')}
+    ${pillar('Exercise',exLine,'workout','<path d="M3 12h4l3-7 4 14 3-7h4"/>','var(--green)')}
+    ${pillar('Stress',stressLine,'recovery','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>','var(--purple)')}
+    ${pillar('Supplements',suppLine,'supps','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','var(--green)')}
   </div>`;
-  // ── 4. Today's NS practice ───────────────────────────────────────────────
-  const da = getTodayActivity();
-  const catLabel = Object.entries(NS_CATS).find(([k])=>k===da.cat)?.[1] || da.cat;
-  h += `<div class="card" style="margin-bottom:11px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--blue)">Today's Practice</div>
-      <div style="font-size:10px;background:rgba(122,154,171,.15);color:var(--blue);padding:2px 8px;border-radius:10px;font-weight:600">${catLabel}</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center">${getNSActIcon(da.id)}</div>
-      <div>
-        <div style="font-size:16px;font-weight:700">${da.n}</div>
-        <div style="font-size:12px;color:var(--sub);margin-top:2px">${da.tag}</div>
-      </div>
-    </div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:10px">⏱ ${da.dur}</div>
-    <div id="today-act-steps" style="display:none;margin-bottom:10px">
-      ${da.steps.map((s,i)=>`<div style="font-size:13px;line-height:1.5;padding:5px 0;display:flex;gap:8px"><span style="color:var(--blue);font-weight:700;min-width:16px">${i+1}.</span><span>${s}</span></div>`).join('')}
-      ${da.why?`<div style="margin-top:8px;padding:8px 10px;background:rgba(122,154,171,.1);border-radius:var(--rs);font-size:11px;color:var(--sub);line-height:1.5"><strong style="color:var(--blue)">Why it works:</strong> ${da.why}</div>`:''}
-      ${da.id==='cold-plunge'?`<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1;color:var(--blue)" onclick="openTimer('Cold Plunge',${isTrain()?390:540})">⏱ Start Timer (${isTrain()?'6.5':'9'} min)</button></div>`:''}
-      ${da.id==='sauna'?`<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1;color:var(--orange)" onclick="openTimer('Sauna',${isTrain()?1050:1350})">⏱ Start Timer (${isTrain()?'17':'22'} min)</button></div>`:''}
-    </div>
-    <button class="btn btn-s btn-sm btn-f" onclick="const s=document.getElementById('today-act-steps');const b=this;if(s.style.display==='none'){s.style.display='block';b.textContent='Hide Steps'}else{s.style.display='none';b.textContent='▸ Show Steps'}">▸ Show Steps</button>
-  </div>`;
-  // (Hydration card intentionally removed — Hydrate quick action covers it.)
-  // ── 5. This Week — glanceable mini-heatmap ────────────────────────────────
-  // Three metric rows, seven small squares each. Filled = goal hit on that
-  // day, light = missed, dim = future. Tap a day to jump to its view.
+  h+=`<div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn btn-g btn-f" style="flex:1" onclick="goPage('food');openFood()">+ Log food</button>
+    <button class="btn btn-s btn-f" style="flex:1;color:var(--text)" onclick="goPage('detective')">Ask the Detective</button></div>`;
+  // ── This Week heatmap (kept) ──
   const wk=getWeekData();
   const todayKey=dk();
-  // A day counts as a workout if ANY of:
-  //   • wd_ "Mark Session Complete" flag is set
-  //   • wl_ exercise log has any entry (logged sets OR marked-done exercises)
-  // Be lenient — undercounting is the failure mode we keep running into.
-  const workoutHit=wk.map(d=>{
-    if(lsGet('wd_'+d.key,'0')==='1')return true;
-    try{
-      const wl=JSON.parse(lsGet('wl_'+d.key,'[]'));
-      return Array.isArray(wl)&&wl.length>0;
-    }catch(e){return false;}
-  });
+  const workoutHit=wk.map(d=>{ if(lsGet('wd_'+d.key,'0')==='1')return true; try{const wl=JSON.parse(lsGet('wl_'+d.key,'[]'));return Array.isArray(wl)&&wl.length>0;}catch(e){return false;} });
   const wd=wk.filter(d=>d.hasData);
   const avgP=wd.length?Math.round(wd.reduce((s,d)=>s+d.p,0)/wd.length):0;
   const avgK=wd.length?Math.round(wd.reduce((s,d)=>s+d.k,0)/wd.length):0;
@@ -2739,57 +2686,24 @@ function rToday(){
   const protCount=protHit.filter(Boolean).length;
   const kcalCount=kcalHit.filter(Boolean).length;
   const workoutCount=workoutHit.filter(Boolean).length;
-  // Target = 4 sessions/week (planned schedule). Allow exceeding (e.g. 5/4).
   const workoutTarget=4;
-  // Current protein streak (consecutive most-recent days with goal met)
   let streak=0;
-  for(let i=wk.length-1;i>=0;i--){
-    if(wk[i].key>todayKey)continue;       // skip future
-    if(protHit[i])streak++;
-    else if(wk[i].hasData)break;          // missed
-    else break;                           // no data — streak broken
-  }
-  // Heatmap row builder. fillFn(d,idx) returns true when the day's goal was
-  // hit. Future days render as dim placeholders.
+  for(let i=wk.length-1;i>=0;i--){ if(wk[i].key>todayKey)continue; if(protHit[i])streak++; else if(wk[i].hasData)break; else break; }
   const heatRow=(label,fillFn,count,total,color)=>{
-    const cells=wk.map((d,i)=>{
-      const isFuture=d.key>todayKey;
-      const hit=fillFn(d,i);
-      const bg=isFuture
-        ?'var(--surface3)'
-        :(hit?color:'rgba(0,0,0,0.06)');
-      const op=isFuture?0.4:1;
-      const ring=d.isToday?`box-shadow:inset 0 0 0 1.5px var(--text)`:'';
-      return `<div onclick="viewDay('${d.key}')" style="flex:1;height:18px;border-radius:4px;background:${bg};opacity:${op};${ring};cursor:pointer"></div>`;
-    }).join('');
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <div style="width:62px;font-size:11px;color:var(--sub);font-weight:600">${label}</div>
-      <div style="flex:1;display:flex;gap:3px">${cells}</div>
-      <div style="font-size:11px;font-weight:700;color:var(--text);min-width:30px;text-align:right">${count}/${total}</div>
-    </div>`;
+    const cells=wk.map((d,i)=>{ const isFuture=d.key>todayKey; const hit=fillFn(d,i); const bg=isFuture?'var(--surface3)':(hit?color:'rgba(0,0,0,0.06)'); const op=isFuture?0.4:1; const ring=d.isToday?'box-shadow:inset 0 0 0 1.5px var(--text)':''; return `<div onclick="viewDay('${d.key}')" style="flex:1;height:18px;border-radius:4px;background:${bg};opacity:${op};${ring};cursor:pointer"></div>`; }).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:62px;font-size:11px;color:var(--sub);font-weight:600">${label}</div><div style="flex:1;display:flex;gap:3px">${cells}</div><div style="font-size:11px;font-weight:700;color:var(--text);min-width:30px;text-align:right">${count}/${total}</div></div>`;
   };
   const dayLabels=wk.map(d=>`<div style="flex:1;text-align:center;font-size:10px;color:${d.isToday?'var(--text)':'var(--sub)'};font-weight:${d.isToday?700:500}">${d.label}</div>`).join('');
-  h+=`<div class="card">
-    <div class="ct">This Week</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-      <div style="width:62px"></div>
-      <div style="flex:1;display:flex;gap:3px">${dayLabels}</div>
-      <div style="min-width:30px"></div>
-    </div>
+  h+=`<div class="card"><div class="ct">This Week</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><div style="width:62px"></div><div style="flex:1;display:flex;gap:3px">${dayLabels}</div><div style="min-width:30px"></div></div>
     ${heatRow('Protein',(d,i)=>protHit[i],protCount,7,'var(--green)')}
     ${heatRow('Kcal',(d,i)=>kcalHit[i],kcalCount,7,'var(--orange)')}
     ${heatRow('Workout',(d,i)=>workoutHit[i],workoutCount,workoutTarget,'var(--blue)')}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--sub)">
-        ${streak>=2?`<span style="color:var(--green);font-weight:700">${streak}-day protein streak</span>`
-                  :`<span>avg ${avgP}g protein · ${avgK} kcal</span>`}
-      </div>
+      <div style="font-size:12px;color:var(--sub)">${streak>=2?`<span style="color:var(--green);font-weight:700">${streak}-day protein streak</span>`:`<span>avg ${avgP}g protein · ${avgK} kcal</span>`}</div>
       <div style="font-size:10px;color:var(--sub)">tap a day to view</div>
-    </div>
-  </div>`;
-  // ── 6. Supplements (collapsible) ──────────────────────────────────────────
-  h+=buildSuppCard();
-  // ── 7. Daily Routine ──────────────────────────────────────────────────────
+    </div></div>`;
+  // ── Daily Routine (kept) ──
   const rout=getRoutine(tr);
   const routCollapsed=isRoutineCollapsed();
   h+=`<div class="card">
@@ -2797,13 +2711,10 @@ function rToday(){
       <div class="ct" style="margin-bottom:0">Daily Routine</div>
       <div style="display:flex;align-items:center;gap:10px">
         <button onclick="event.stopPropagation();openRoutineEditor()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;padding:0;font-family:var(--font-sans);font-weight:600">Edit</button>
-        ${routCollapsed
-          ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`
-          : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`
-        }
+        ${routCollapsed?`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`}
       </div>
     </div>
-    ${routCollapsed ? '' : rout.map(r=>`<div class="rr"><div class="rt">${r.t}</div><div><div class="ra">${r.a}</div>${r.n?`<div class="rn">${r.n}</div>`:''}</div></div>`).join('')}
+    ${routCollapsed?'':rout.map(r=>`<div class="rr"><div class="rt">${r.t}</div><div><div class="ra">${r.a}</div>${r.n?`<div class="rn">${r.n}</div>`:''}</div></div>`).join('')}
   </div>`;
   document.getElementById('page-today').innerHTML=h;
 }
