@@ -9268,7 +9268,7 @@ async function detSend(forced){
     if(res.status===429){_detReplace("We've hit today's free AI limit. The Detective needs the paid key to run reliably — for now, try again in a bit.");return;}
     const data=await res.json();
     let raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    if(!raw){_detReplace("I couldn't reach my thinking just now — please try again in a moment.");return;}
+    if(!raw){const em=(data&&data.error&&data.error.message)?data.error.message:'';_detReplace("I couldn't reach my thinking just now"+(em?(" — "+em):"")+". Please try again in a moment.");return;}
     // parse footers
     let sources=[],action='none';
     const sm=raw.match(/\[sources:\s*([^\]]+)\]/i);if(sm)sources=sm[1].split(',').map(s=>s.trim()).filter(Boolean);
