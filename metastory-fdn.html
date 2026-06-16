@@ -2640,82 +2640,66 @@ function saveRoutineEditor(){
 
 // ── TODAY ─────────────────────────────────────────────────────────────────────
 function rToday(){
-  const m=getMacros(),t=getTgt(),wo=getWO(),tr=isTrain(),done=isWODone();
-  let prof={};try{prof=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
-  const hr=new Date().getHours();
+  const now=new Date(),hr=now.getHours();
   const greet=hr<12?'Good morning':(hr<18?'Good afternoon':'Good evening');
+  let prof={};try{prof=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
   const name=prof.name?(', '+String(prof.name).split(' ')[0]):'';
-  // ── pillar status lines ──
-  const calLeft=Math.max(0,Math.round((t.k||0)-(m.k||0)));
-  const dietLine=calLeft+' cal left · '+Math.round(m.p)+'/'+t.p+'g protein';
-  let sleep=null;try{sleep=JSON.parse(lsGet('rest_'+dk(),'null'));}catch(e){}
-  const restLine=(sleep&&sleep.h)?('Last night '+sleep.h+'h'):'Tap to log last night';
-  const exLine=tr?(wo?(done?(wo.name+' · done'):wo.name):'Training day'):'Rest day · recover';
-  const ss=lsGet('stress_'+dk(),'');
-  const stressLine=ss?('Feeling '+ss+' today'):'Check in on how you feel';
-  let plan=[],taken=[];try{plan=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
-  try{taken=JSON.parse(lsGet('supptk_'+dk(),'[]'))||[];}catch(e){}
-  const suppLine=plan.length?(taken.length+'/'+plan.length+' taken today'):'Foundations first';
-  const pillar=(label,line,page,icon,color)=>`<div class="mk-row" style="padding:12px 0;border-top:1px solid var(--border)" onclick="goPage('${page}')">
-    <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>
-    <div style="flex:1;min-width:0"><h4 style="font-size:14px;font-weight:700">${label}</h4><small style="font-size:11.5px;color:var(--sub)">${line}</small></div>
-    <span style="color:var(--sub);margin-left:auto">›</span></div>`;
+  const R=_routineNow();
+  const lead=R.active.length
+    ? 'Here’s what your day is asking for right now.'
+    : (R.next ? ('Next up: '+R.next.a+' · '+_winLabel(R.next)) : 'Nothing scheduled right now — a good moment to just check in with yourself.');
   let h=`<div class="fdn-focus" style="margin-bottom:14px">
-    <span class="kicker">${tr?'Training day':'Rest day'}</span>
+    <span class="kicker">Right now · ${_fmtClock(now)}</span>
     <h3>${greet}${name}</h3>
-    <p>Your five daily pillars at a glance — tap any to dive in.</p></div>`;
-  h+=`<div class="card" style="padding:4px 15px">
-    ${pillar('Diet',dietLine,'food','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>','var(--green)')}
-    ${pillar('Rest',restLine,'rest','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>','var(--blue)')}
-    ${pillar('Exercise',exLine,'workout','<path d="M3 12h4l3-7 4 14 3-7h4"/>','var(--green)')}
-    ${pillar('Stress',stressLine,'recovery','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>','var(--purple)')}
-    ${pillar('Supplements',suppLine,'supps','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','var(--green)')}
-  </div>`;
-  h+=`<div style="display:flex;gap:8px;margin-bottom:12px">
-    <button class="btn btn-g btn-f" style="flex:1" onclick="goPage('food');openFood()">+ Log food</button>
-    <button class="btn btn-s btn-f" style="flex:1;color:var(--text)" onclick="goPage('detective')">Ask the Detective</button></div>`;
-  // ── This Week heatmap (kept) ──
-  const wk=getWeekData();
-  const todayKey=dk();
-  const workoutHit=wk.map(d=>{ if(lsGet('wd_'+d.key,'0')==='1')return true; try{const wl=JSON.parse(lsGet('wl_'+d.key,'[]'));return Array.isArray(wl)&&wl.length>0;}catch(e){return false;} });
-  const wd=wk.filter(d=>d.hasData);
-  const avgP=wd.length?Math.round(wd.reduce((s,d)=>s+d.p,0)/wd.length):0;
-  const avgK=wd.length?Math.round(wd.reduce((s,d)=>s+d.k,0)/wd.length):0;
-  const protHit=wk.map(d=>d.hasData&&d.p>=d.tgtP);
-  const kcalHit=wk.map(d=>d.hasData&&d.k>=d.tgtK*0.9&&d.k<=d.tgtK*1.1);
-  const protCount=protHit.filter(Boolean).length;
-  const kcalCount=kcalHit.filter(Boolean).length;
-  const workoutCount=workoutHit.filter(Boolean).length;
-  const workoutTarget=4;
-  let streak=0;
-  for(let i=wk.length-1;i>=0;i--){ if(wk[i].key>todayKey)continue; if(protHit[i])streak++; else if(wk[i].hasData)break; else break; }
-  const heatRow=(label,fillFn,count,total,color)=>{
-    const cells=wk.map((d,i)=>{ const isFuture=d.key>todayKey; const hit=fillFn(d,i); const bg=isFuture?'var(--surface3)':(hit?color:'rgba(0,0,0,0.06)'); const op=isFuture?0.4:1; const ring=d.isToday?'box-shadow:inset 0 0 0 1.5px var(--text)':''; return `<div onclick="viewDay('${d.key}')" style="flex:1;height:18px;border-radius:4px;background:${bg};opacity:${op};${ring};cursor:pointer"></div>`; }).join('');
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:62px;font-size:11px;color:var(--sub);font-weight:600">${label}</div><div style="flex:1;display:flex;gap:3px">${cells}</div><div style="font-size:11px;font-weight:700;color:var(--text);min-width:30px;text-align:right">${count}/${total}</div></div>`;
-  };
-  const dayLabels=wk.map(d=>`<div style="flex:1;text-align:center;font-size:10px;color:${d.isToday?'var(--text)':'var(--sub)'};font-weight:${d.isToday?700:500}">${d.label}</div>`).join('');
-  h+=`<div class="card"><div class="ct">This Week</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><div style="width:62px"></div><div style="flex:1;display:flex;gap:3px">${dayLabels}</div><div style="min-width:30px"></div></div>
-    ${heatRow('Protein',(d,i)=>protHit[i],protCount,7,'var(--green)')}
-    ${heatRow('Kcal',(d,i)=>kcalHit[i],kcalCount,7,'var(--orange)')}
-    ${heatRow('Workout',(d,i)=>workoutHit[i],workoutCount,workoutTarget,'var(--blue)')}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--sub)">${streak>=2?`<span style="color:var(--green);font-weight:700">${streak}-day protein streak</span>`:`<span>avg ${avgP}g protein · ${avgK} kcal</span>`}</div>
-      <div style="font-size:10px;color:var(--sub)">tap a day to view</div>
-    </div></div>`;
-  // ── Daily Routine (kept) ──
-  const rout=getRoutine(tr);
-  const routCollapsed=isRoutineCollapsed();
+    <p>${lead}</p></div>`;
+  // Right-now routine steps (checkable)
+  if(R.active.length){
+    h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Right now</span><div style="margin-top:6px">`;
+    R.active.forEach(it=>{
+      h+=`<div class="chk-row" onclick="toggleRouteDone(${it.i})">
+        <div class="chk-box ${it.done?'on':''}">${it.done?_CHECK_SVG:''}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:700">${it.a}</div>${it.n?`<small style="font-size:11px;color:var(--sub)">${it.n}</small>`:''}</div>
+        ${(it.tab&&it.tab!=='today')?`<button class="mk-link" onclick="event.stopPropagation();goPage('${it.tab}')">Open</button>`:''}
+      </div>`;
+    });
+    h+=`</div></div>`;
+  }
+  // Pending meal check-in
+  const pend=_pendingMealCheckin();
+  if(pend){
+    h+=`<div class="fdn-chip" style="cursor:pointer" onclick="goPage('food')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span><b>A meal check-in is waiting</b> — a few seconds on how ${pend} sat with you. That signal is how you learn your right plate.</span></div>`;
+  }
+  // This week's focus
+  let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress());if(fx&&fx.label)focus=fx.label;}}catch(e){}
+  if(focus){
+    h+=`<div class="card" style="background:rgba(183,186,167,.18);border-color:var(--purple)"><span class="kicker" style="color:#6d7868">This week's focus</span><div style="font-size:14px;font-weight:700;margin-top:4px">${focus}</div></div>`;
+  }
+  // Detective entry
+  h+=`<div class="card mk-row" onclick="goPage('detective')" style="cursor:pointer">
+    <div class="mk-meal-ic" style="background:rgba(196,112,112,.16);color:var(--green)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></div>
+    <div style="flex:1;min-width:0"><h4 style="font-size:14px;font-weight:700">Ask the Health Detective</h4><small style="font-size:11.5px;color:var(--sub)">Anything about your sleep, energy, digestion, stress…</small></div>
+    <span style="color:var(--sub);margin-left:auto">›</span></div>`;
+  // The rest of today (the routine, as a timeline)
+  const upcoming=R.all.filter(it=>!it.done && it.h1>hr && !(hr>=it.h0&&hr<it.h1));
   h+=`<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${routCollapsed?0:9}px;cursor:pointer" onclick="toggleRoutineCollapsed()">
-      <div class="ct" style="margin-bottom:0">Daily Routine</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <button onclick="event.stopPropagation();openRoutineEditor()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;padding:0;font-family:var(--font-sans);font-weight:600">Edit</button>
-        ${routCollapsed?`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>`}
-      </div>
-    </div>
-    ${routCollapsed?'':rout.map(r=>`<div class="rr"><div class="rt">${r.t}</div><div><div class="ra">${r.a}</div>${r.n?`<div class="rn">${r.n}</div>`:''}</div></div>`).join('')}
-  </div>`;
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="kicker" style="color:var(--sub)">The rest of today</span>
+      <button class="mk-link" onclick="openRoutineEditor()">Edit</button>
+    </div>`;
+  if(upcoming.length){
+    h+=`<div style="margin-top:6px">`;
+    upcoming.forEach(it=>{
+      h+=`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--sub);width:70px;flex:none">${_winLabel(it)}</div>
+        <div style="flex:1;font-size:13px;font-weight:600">${it.a}</div></div>`;
+    });
+    h+=`</div>`;
+  }else{
+    h+=`<div style="font-size:13px;color:var(--sub);padding:10px 0 2px;line-height:1.5">That's everything for today. Nicely done.</div>`;
+  }
+  h+=`</div>`;
   document.getElementById('page-today').innerHTML=h;
 }
 
@@ -3019,7 +3003,7 @@ let _nsCat = 'all';
 let _nsExpanded = null;
 
 function rRecovery(){
-  let h = '';
+  let h = _tabRoutineHTML('recovery');
 
   // ── FDN state check-in + suggested practice (mockup Stress board) ──
   const _ss=lsGet('stress_'+viewDate,'');
@@ -8685,7 +8669,7 @@ function saveRest(){
 function rRest(){
   const r=_restGet()||{h:0,bed:'',wake:''};
   const wind=_windGet();
-  let h='';
+  let h=_tabRoutineHTML('rest');
   // last night
   h+=`<div class="card" style="margin-bottom:12px">
     <span class="kicker">Last night</span>`;
@@ -8757,7 +8741,7 @@ function startTitr(id){
 }
 function rSupps(){
   const plan=_suppPlan();const taken=_suppTaken();const t=_titr();
-  let h='';
+  let h=_tabRoutineHTML('supps');
   // Safety banner — reflects the user's health flags so gating is visible on this tab
   try{
     const f=_detFlags();
@@ -8825,7 +8809,7 @@ function rDiet(){
   const log=getLog(),m=getMacros(),t=getTgt();
   const calLeft=Math.max(0,Math.round((t.k||0)-(m.k||0)));
   const calPct=t.k?Math.min(100,Math.round((m.k||0)/t.k*100)):0;
-  let h=`<div class="card">
+  let h=_tabRoutineHTML('food')+`<div class="card">
     <div class="mk-cals">
       <div class="mk-ring" style="background:conic-gradient(var(--green) 0 ${calPct}%, var(--surface3) ${calPct}% 100%)">
         <div class="mk-ring-in"><b>${calLeft}</b><small>CAL LEFT</small></div>
@@ -9264,6 +9248,62 @@ function rDressSummary(){
   h+=`<button class="btn btn-g btn-f" style="margin-top:4px" onclick="goPage('detective')">Ask the Detective about your plan</button>
   </div>`;
   document.getElementById('page-summary').innerHTML=h;
+}
+
+/* ════════════ TIME-AWARE ROUTINE ENGINE ════════════ */
+const _CHECK_SVG='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+function _routeDone(){try{return JSON.parse(lsGet('routedone_'+dk(),'[]'))||[];}catch(e){return[];}}
+function toggleRouteDone(i){let d=_routeDone();d=d.includes(i)?d.filter(x=>x!==i):d.concat(i);lsSet('routedone_'+dk(),JSON.stringify(d));try{if(typeof curPage!=='undefined'){if(curPage==='today')rToday();else if(typeof render==='function')render(curPage);}}catch(e){}}
+function _classifyRoutine(){
+  const tr=(typeof isTrain==='function')?isTrain():true;
+  let rows=[];try{rows=(typeof getRoutine==='function')?(getRoutine(tr)||[]):[];}catch(e){}
+  const done=_routeDone();
+  return rows.map((r,i)=>{
+    const lbl=((r.t||'')+'').toLowerCase();
+    const txt=((r.t||'')+' '+(r.a||'')+' '+(r.n||'')).toLowerCase();
+    let h0=6,h1=22;
+    if(/wake/.test(lbl)){h0=5;h1=9;}
+    else if(/morning/.test(lbl)){h0=7;h1=11;}
+    else if(/pre.?workout/.test(lbl)){h0=15;h1=18;}
+    else if(/post.?workout/.test(lbl)){h0=16;h1=19;}
+    else if(/lunch/.test(lbl)){h0=11;h1=14;}
+    else if(/afternoon/.test(lbl)){h0=13;h1=17;}
+    else if(/dinner/.test(lbl)){h0=17;h1=20;}
+    else if(/before bed|night|evening|wind/.test(lbl)){h0=20;h1=24;}
+    else { const frac=rows.length>1?i/(rows.length-1):0; h0=Math.round(6+frac*15); h1=h0+3; }
+    let tab='today';
+    if(/water|hydrat|\boz\b|drink/.test(txt))tab='food';
+    else if(/sunlight|outside|nature|morning light|daylight/.test(txt))tab='recovery';
+    else if(/workout|train|lift|exercise|warm.?up|mobility|stretch/.test(txt))tab='workout';
+    else if(/breakfast|lunch|dinner|meal|eat|protein|snack|carb|\bfood\b/.test(txt))tab='food';
+    else if(/screen|blue light|\bbed\b|sleep|wind|melatonin|dark room|lights/.test(txt))tab='rest';
+    else if(/breath|meditat|relax|gratitude|stress|\bcalm\b|journal|prayer|walk/.test(txt))tab='recovery';
+    else if(/supplement|vitamin|magnesium|omega|creatine|probiotic/.test(txt))tab='supps';
+    return {i,t:r.t||'',a:r.a||'',n:r.n||'',tab,h0,h1,done:done.includes(i)};
+  });
+}
+function _routineNow(){
+  const all=_classifyRoutine();const hr=new Date().getHours();
+  const active=all.filter(it=>!it.done && hr>=it.h0 && hr<it.h1);
+  let next=null;
+  all.filter(it=>!it.done && it.h0>hr).sort((a,b)=>a.h0-b.h0).forEach(it=>{if(!next)next=it;});
+  return {all,active,next};
+}
+function _winLabel(it){ if(it.t)return it.t; const h=it.h0; const ap=h<12?'am':'pm'; const hh=(h%12)||12; return '~'+hh+ap; }
+function _fmtClock(d){ let h=d.getHours();const ap=h<12?'am':'pm';h=(h%12)||12;return h+':'+String(d.getMinutes()).padStart(2,'0')+ap; }
+function _pendingMealCheckin(){
+  try{const log=JSON.parse(lsGet('fl_'+dk(),'[]'))||[];const now=Date.now();
+    for(let j=log.length-1;j>=0;j--){const e=log[j];const ma=Array.isArray(e.moodAfter)?e.moodAfter.length:!!e.moodAfter;const ts=e.ts||0;
+      if(!ma && ts && (now-ts)<10800000 && (now-ts)>1800000)return e.name;}
+  }catch(e){}return null;
+}
+// Slim "right now" prompt for a given tab — shows active, not-done routine items mapped there.
+function _tabRoutineHTML(tab){
+  try{const items=_routineNow().active.filter(it=>it.tab===tab);if(!items.length)return '';
+    return items.map(it=>`<div class="fdn-chip" style="cursor:pointer;background:rgba(183,186,167,.2);border-color:var(--purple)" onclick="toggleRouteDone(${it.i})">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span><b>Right now:</b> ${it.a}${it.n?' — '+it.n:''} <span style="color:var(--green);font-weight:700">Tap when done</span></span></div>`).join('');
+  }catch(e){return '';}
 }
 
 /* ════════════ PREVIEW SANDBOX: seed sample data + banner ════════════ */
