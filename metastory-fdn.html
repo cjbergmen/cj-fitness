@@ -9242,7 +9242,6 @@ function _avg7(){
   }
   return {avgP:pN?Math.round(pSum/pN):0,avgSleep:slN?+(slSum/slN).toFixed(1):0,workouts:woN};
 }
-// Non-diagnostic, "systems under stress" labels (keep internal keys for stored results).
 function _nsDisplayName(p){
   return ({
     'High Performer Dysregulation':'The High Performer, running hot',
@@ -9255,6 +9254,8 @@ function _nsDisplayName(p){
 function _dressData(){
   let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
   let ns=null;try{ns=JSON.parse(lsGet('_assess_ns_result','null'));}catch(e){}
+  let gut=null;try{gut=JSON.parse(lsGet('_assess_gut_result','null'));}catch(e){}
+  let aa=null;try{aa=JSON.parse(lsGet('_assess_aa_result','null'));}catch(e){}
   const lever=(typeof _firstLever==='function'&&ns)?_firstLever(ns):null;
   const t=(typeof getTgt==='function')?getTgt():{};
   const a=_avg7();
@@ -9262,36 +9263,51 @@ function _dressData(){
   let supps=[];try{supps=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
   let titr=null;try{titr=JSON.parse(lsGet('_supp_titr','null'));}catch(e){}
   const tm=p.times||{};
-  return {p,ns,lever,t,a,ss,supps,titr,tm,goal:p.goal||'general wellness',name:p.name||''};
+  return {p,ns,gut,aa,lever,t,a,ss,supps,titr,tm,goal:p.goal||'general wellness',name:p.name||''};
+}
+// "Your story" — the long-term, global synthesis (vs. Weekly Review = recent).
+// Draws on all assessments + the 30-day DRESS picture from computeProgress.
+function _dressStorySynth(d){
+  let pr=null;try{if(typeof computeProgress==='function')pr=computeProgress();}catch(e){}
+  const parts=[];
+  if(pr&&typeof pr.overall==='number'&&(pr.cats||[]).some(c=>c.score!=null&&c.id!=='assess')){
+    parts.push(`Your last 30 days read as <b>${pr.label}</b>${pr.trendLabel?(', '+pr.trendLabel):''}.`);
+    const scored=(pr.cats||[]).filter(c=>c.score!=null&&c.id!=='assess');
+    if(scored.length>=2){
+      const strong=scored.slice().sort((a,b)=>b.score-a.score)[0];
+      const weak=scored.slice().sort((a,b)=>a.score-b.score)[0];
+      if(strong&&weak&&strong.id!==weak.id) parts.push(`<b>${strong.label}</b> is your steadiest piece; <b>${weak.label}</b> is where the most opening is.`);
+    }
+  } else {
+    parts.push('Your story is just beginning — log a few days across food, movement, and sleep and this fills in with your real patterns.');
+  }
+  if(d.ns&&d.ns.pattern){
+    const nm=(typeof _nsDisplayName==='function')?_nsDisplayName(d.ns.pattern):d.ns.pattern;
+    parts.push(`Your nervous-system read is <b>${nm}</b>${d.lever?(' — the first lever is '+d.lever.title.charAt(0).toLowerCase()+d.lever.title.slice(1)):''}.`);
+  }
+  if(d.gut&&d.gut.severity){ parts.push(`Digestive load is reading <b>${String(d.gut.severity).toLowerCase()}</b> right now.`); }
+  let done=0;try{done=(pr&&pr.stats&&pr.stats.assessDone)||0;}catch(e){}
+  if(done<3) parts.push(`Finishing your assessments (${done}/3) will sharpen this picture.`);
+  return parts.join(' ');
 }
 function _dressReads(d){
   const {t,a,ss,supps,titr}=d;
   return {
-    diet:{
-      covers:'Plate balance · blood sugar · hydration · food quality',
+    diet:{covers:'Plate balance · blood sugar · hydration · food quality',
       status: a.avgP ? `Protein is averaging <b>${a.avgP}g/day</b>${t.p?` (target ${t.p}g)`:''}.` : 'Not enough logged yet to read your plate.',
-      focus: (a.avgP&&t.p&&a.avgP<t.p*0.85) ? 'Anchor breakfast with 30g+ protein — steadier energy, fewer afternoon cravings.' : 'Plate ratios are landing. Keep the post-meal check-ins going to learn your steadiest mix.'
-    },
-    rest:{
-      covers:'Sleep length · wind-down · circadian light · the 10pm window',
+      focus: (a.avgP&&t.p&&a.avgP<t.p*0.85) ? 'Anchor breakfast with 30g+ protein — steadier energy, fewer afternoon cravings.' : 'Plate ratios are landing. Keep the post-meal check-ins going to learn your steadiest mix.'},
+    rest:{covers:'Sleep length · wind-down · circadian light · the 10pm window',
       status: a.avgSleep ? `Sleeping <b>${a.avgSleep}h</b> on average this week.` : 'No sleep logged yet this week.',
-      focus: (a.avgSleep&&a.avgSleep<7) ? 'Protect the 10pm window — the hours before midnight count double for recovery and hormones.' : 'Hold the rhythm. A consistent bedtime is worth more than any single long night.'
-    },
-    exercise:{
-      covers:'Movement matched to recovery · strength · daily walking',
+      focus: (a.avgSleep&&a.avgSleep<7) ? 'Protect the 10pm window — the hours before midnight count double for recovery and hormones.' : 'Hold the rhythm. A consistent bedtime is worth more than any single long night.'},
+    exercise:{covers:'Movement matched to recovery · strength · daily walking',
       status: `<b>${a.workouts}</b> session${a.workouts===1?'':'s'} logged this week.`,
-      focus: 'Match intensity to recovery — on rough-sleep weeks, ease the load before pushing. Consistency beats intensity.'
-    },
-    stress:{
-      covers:'Nervous-system regulation · breath · connection · stillness',
+      focus: 'Match intensity to recovery — on rough-sleep weeks, ease the load before pushing. Consistency beats intensity.'},
+    stress:{covers:'Nervous-system regulation · breath · connection · stillness',
       status: ss ? `You checked in feeling <b>${ss}</b> today.` : 'No nervous-system check-in yet today.',
-      focus: 'A few minutes of daily down-regulation is the multiplier behind sleep, digestion, and blood sugar.'
-    },
-    supps:{
-      covers:'Targeted support — one at a time, after the foundations hold',
+      focus: 'A few minutes of daily down-regulation is the multiplier behind sleep, digestion, and blood sugar.'},
+    supps:{covers:'Targeted support — one at a time, after the foundations hold',
       status: titr ? `Titrating <b>${titr.name}</b>, day ${titr.day||1}.` : (supps.length?`<b>${supps.length}</b> in your routine.`:'No supplements yet.'),
-      focus: 'One at a time, lowest dose, step up slowly. Foundations outrank any bottle.'
-    }
+      focus: 'One at a time, lowest dose, step up slowly. Foundations outrank any bottle.'}
   };
 }
 function rDressSummary(){
@@ -9313,17 +9329,10 @@ function rDressSummary(){
       <div style="font-size:16px;font-weight:700">My DRESS Summary</div>
     </div>
     <div class="fdn-focus" style="margin-bottom:14px">
-      <span class="kicker">Your program at a glance</span>
-      <h3>${d.name?d.name+'’s story':'Your story'}</h3>
-      <p>Working toward ${d.goal}. A plain-language read on all five pillars — yours to show a coach, a practitioner, or just yourself.</p>
+      <span class="kicker">Your story</span>
+      <h3>${d.name?d.name+'’s story so far':'Your story so far'}</h3>
+      <p style="line-height:1.6">${_dressStorySynth(d)}</p>
     </div>`;
-  if(d.ns&&d.ns.pattern){
-    h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Systems under stress</span>
-      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${_nsDisplayName(d.ns.pattern)}</div>
-      ${d.lever?`<div style="font-size:13px;color:var(--sub);line-height:1.55"><b style="color:var(--text)">First lever:</b> ${d.lever.title} — ${d.lever.body}</div>`:''}</div>`;
-  } else {
-    h+=`<div class="card" onclick="_assessPage='hub';goPage('assess')" style="cursor:pointer"><div style="font-size:13px;color:var(--sub);line-height:1.55">Take the assessments to see which of your systems are working hardest — and your first lever.</div></div>`;
-  }
   h+=`<div class="ct" style="padding:6px 3px 8px">Where each pillar stands</div>`;
   h+=readCard('Diet','var(--green)','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>',reads.diet,'food');
   h+=readCard('Rest','var(--blue)','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>',reads.rest,'rest');
@@ -9351,7 +9360,8 @@ function _copyDressSummary(){
     const lines=[];
     lines.push('METASTORY — DRESS SUMMARY'+(d.name?(' · '+d.name):''));
     lines.push('Goal: '+d.goal);
-    if(d.ns&&d.ns.pattern){lines.push('');lines.push('Systems under stress: '+_nsDisplayName(d.ns.pattern));if(d.lever)lines.push('First lever: '+d.lever.title+' — '+strip(d.lever.body));}
+    lines.push('');lines.push('YOUR STORY SO FAR');
+    lines.push(strip(_dressStorySynth(d)));
     lines.push('');lines.push('THE FIVE PILLARS');
     [['Diet',reads.diet],['Rest',reads.rest],['Exercise',reads.exercise],['Stress',reads.stress],['Supplements',reads.supps]].forEach(([l,r])=>{
       lines.push('• '+l+' ('+r.covers+'): '+strip(r.status)+' Focus: '+strip(r.focus));
