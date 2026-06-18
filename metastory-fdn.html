@@ -893,7 +893,7 @@ function rSettingsModal(){
     </div>
     <div class="card" style="margin-bottom:10px">
       <div class="ct">Health &amp; safety flags</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">These let the Health Detective and supplement guidance keep your doctor in the loop where it matters. Private to your account — tap any that apply to you.</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">These let the Health Detective and supplement guidance keep your practitioner in the loop where it matters. Private to your account — tap any that apply to you.</div>
       ${(()=>{
         let f=[];try{f=JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){}
         const opts=[['pregnant','Pregnant / nursing'],['cancer','Cancer (current or history)'],['ppi','Reflux meds, ulcer, or regular NSAIDs'],['antidepressant','Antidepressant / mood medication'],['bp','Blood pressure condition'],['virus','Latent virus (EBV, shingles, Lyme)'],['bloodthinner','Blood thinners / upcoming surgery'],['diabetes','Diabetes on medication'],['minor','Under 18']];
@@ -3919,7 +3919,7 @@ function rAssessResults(assess){
     <div style="font-size:12px;color:var(--sub);margin-bottom:4px">Completed ${result.date||''}</div>`;
 
   if(assess.id === 'ns'){
-    h += `<div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px">${result.pattern||'—'}</div>
+    h += `<div style="font-size:22px;font-weight:800;color:var(--green);margin-bottom:4px">${(typeof _nsDisplayName==='function'?_nsDisplayName(result.pattern):result.pattern)||'—'}</div>
       <div style="font-size:12px;color:var(--sub)">Primary nervous system pattern</div></div>`;
 
     const bars = [
@@ -8786,7 +8786,7 @@ function rSupps(){
       const labels=f.map(x=>(typeof DET_FLAG_LABELS!=='undefined'&&DET_FLAG_LABELS[x])?DET_FLAG_LABELS[x]:x);
       h+=`<div class="fdn-chip" style="background:rgba(196,133,95,.14);border-color:#d8b2a0;color:#6e5145">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 9v4M12 17v.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-        <span>Because of your health flags (${labels.join(', ')}), some supplements should go by your doctor first. The Health Detective will flag those and won't suggest them. Update anytime in Settings.</span></div>`;
+        <span>Because of your health flags (${labels.join(', ')}), some supplements should go by your practitioner first. The Health Detective will flag those and won't suggest them. Update anytime in Settings.</span></div>`;
     }
   }catch(e){}
   if(t){
@@ -9058,7 +9058,7 @@ const KB_DEEP={
   digestion:{kw:['bloat','gas','constipat','diarrhea','reflux','heartburn','stomach','gut','digest','regular','bowel'],t:`DIGESTION: foundations first — chew well, eat unhurried/unstressed (gut works in "rest" mode), 3–4h between meals, hydration + 30g fiber, daily movement. Bloating threads: eating fast/stressed, big raw-veg loads (cooked is gentler), carbonation, late heavy meals. Reflux already being treated belongs with their doctor — never change reflux meds; comfort basics only (smaller meals, not lying down within 2–3h, personal triggers). RED FLAG: blood in stool, black stools, severe pain, unintended weight loss → doctor.`},
   stress:{kw:['stress','anxious','anxiety','overwhelm','wired','mood','irritable','burnout','drained','panic','tense'],t:`STRESS & MOOD: map state first. Wired (can't settle) → grounding: exhale-longer breathing (4 in, 8 out), slow walk, warm shower, fewer inputs. Drained (nothing left) → do LESS: light, gentle movement, earlier bed, warm food, connection; never "push through" with harder workouts or more caffeine. Foggy → outdoor light + a protein meal + a 10-min walk. The skill is state-shifting on purpose in small daily doses; 3 minutes counts. If language sounds clinical (hopeless, can't function, panic attacks) → suggest a professional warmly.`},
   exercise:{kw:['workout','sore','plateau','overtrain','rest day','gains','weights','cardio','lift','training','recovery'],t:`EXERCISE & RECOVERY: progress = stimulus + recovery; most plateaus are recovery problems in a training costume. Under-recovery signs: sleep dropping, morning grumpiness, soreness 3+ days, performance down two sessions running, higher resting HR, dreading workouts. Response: cut intensity 30–50% for a week (not zero — walks, mobility), protect sleep, eat enough. Rough-sleep weeks: keep the habit, lower the load. Sharp pain (vs normal soreness) → professional.`},
-  supplements:{kw:['supplement','magnesium','vitamin','dose','capsule','stack','feels off','titrat','pill'],t:`SUPPLEMENTS & TITRATION (always within app gating): one at a time so you know what did what; lowest dose first; step up only when current dose feels fine; drop back one step if anything feels off and hold — "feels off" is information. Foundations outrank any bottle. Timing matters (calming minerals evening; energizing earlier). Never suggest doses/brands beyond the user's plan; anything else — especially with a medication in the picture — "bring that one to your practitioner or doctor."`},
+  supplements:{kw:['supplement','magnesium','vitamin','dose','capsule','stack','feels off','titrat','pill'],t:`SUPPLEMENTS & TITRATION (always within app gating): one at a time so you know what did what; lowest dose first; step up only when current dose feels fine; drop back one step if anything feels off and hold — "feels off" is information. Foundations outrank any bottle. Timing matters (calming minerals evening; energizing earlier). Never suggest doses/brands beyond the user's plan; anything else — especially with a medication in the picture — "bring that one to your practitioner."`},
   assessment:{kw:['assessment','result','profile','score','systems','retake','pattern'],t:`ASSESSMENT & PROFILES describe load patterns, not labels of brokenness. High-performer-running-hot: output high, reserves draining — first lever is rest and downshifting, not harder training. Drained/collapse: everything heavy — first lever is gentleness, light, food regularity. Wired-anxious: stuck "on" — first lever is daily grounding + blood-sugar steadiness. Mixed/mild: pick the weakest pillar, improve it 10%. Always re-check in 6–12 weeks; data over identity.`},
   labs:{kw:['lab','test','cortisol','hormone panel','kit','saliva','urine'],t:`LABS & TESTING — educational framing only. At-home wellness panels (saliva stress-hormone rhythm, urine digestion/detox markers, fingerstick gut-barrier) show how hard each system is working — patterns, not diagnoses. You may explain what a category of test looks at and how it would refine the plan. NEVER interpret specific lab values the user types as diagnostic; out-of-range worries → their clinician. Testing accelerates personalization; it's never required to make progress.`}
 };
@@ -9085,7 +9085,7 @@ function _gatesNote(){
     cancer:'No hormone-adjacent supplements (DHEA-type, glutamine); supplement changes need a practitioner.',
     ppi:'No acid-support (betaine HCl-type) content; reflux meds are the prescriber\'s domain.',
     antidepressant:'No mood-adjacent supplements (5-HTP, St John\'s-type, high-dose aminos) — prescriber only.',
-    bp:'No licorice-root-type content; keep exercise intensity moderate pending doctor\'s okay.',
+    bp:'No licorice-root-type content; keep exercise intensity moderate pending your practitioner\'s okay.',
     virus:'No aggressive antimicrobial/biofilm/immune-stimulant content; gentle paths only.',
     bloodthinner:'High-interaction supplements (fish-oil dose changes, vitamin E/K) → prescriber.',
     diabetes:'Blood-sugar experiments need a "talk to your prescriber first" frame (meds + carbs interact).',
@@ -9242,6 +9242,16 @@ function _avg7(){
   }
   return {avgP:pN?Math.round(pSum/pN):0,avgSleep:slN?+(slSum/slN).toFixed(1):0,workouts:woN};
 }
+// Non-diagnostic, "systems under stress" labels (keep internal keys for stored results).
+function _nsDisplayName(p){
+  return ({
+    'High Performer Dysregulation':'The High Performer, running hot',
+    'Trauma-Driven Anxiety':'Wired & watchful',
+    'Biological Anxiety':'Body running hot',
+    'Burnout & Collapse':'Running on empty',
+    'Mild Situational Anxiety':'Mostly steady, occasionally stirred'
+  })[p] || p;
+}
 function _dressData(){
   let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
   let ns=null;try{ns=JSON.parse(lsGet('_assess_ns_result','null'));}catch(e){}
@@ -9256,45 +9266,45 @@ function _dressData(){
 }
 function _dressReads(d){
   const {t,a,ss,supps,titr}=d;
-  const reads={};
-  // Diet
-  reads.diet={
-    status: a.avgP ? `Protein is averaging <b>${a.avgP}g/day</b>${t.p?` (target ${t.p}g)`:''}.` : 'Not enough logged yet to read your plate.',
-    focus: (a.avgP&&t.p&&a.avgP<t.p*0.85) ? 'Anchor breakfast with 30g+ protein — steadier energy, fewer afternoon cravings.' : 'Plate ratios are landing. Keep the post-meal check-ins going to learn your steadiest mix.'
+  return {
+    diet:{
+      covers:'Plate balance · blood sugar · hydration · food quality',
+      status: a.avgP ? `Protein is averaging <b>${a.avgP}g/day</b>${t.p?` (target ${t.p}g)`:''}.` : 'Not enough logged yet to read your plate.',
+      focus: (a.avgP&&t.p&&a.avgP<t.p*0.85) ? 'Anchor breakfast with 30g+ protein — steadier energy, fewer afternoon cravings.' : 'Plate ratios are landing. Keep the post-meal check-ins going to learn your steadiest mix.'
+    },
+    rest:{
+      covers:'Sleep length · wind-down · circadian light · the 10pm window',
+      status: a.avgSleep ? `Sleeping <b>${a.avgSleep}h</b> on average this week.` : 'No sleep logged yet this week.',
+      focus: (a.avgSleep&&a.avgSleep<7) ? 'Protect the 10pm window — the hours before midnight count double for recovery and hormones.' : 'Hold the rhythm. A consistent bedtime is worth more than any single long night.'
+    },
+    exercise:{
+      covers:'Movement matched to recovery · strength · daily walking',
+      status: `<b>${a.workouts}</b> session${a.workouts===1?'':'s'} logged this week.`,
+      focus: 'Match intensity to recovery — on rough-sleep weeks, ease the load before pushing. Consistency beats intensity.'
+    },
+    stress:{
+      covers:'Nervous-system regulation · breath · connection · stillness',
+      status: ss ? `You checked in feeling <b>${ss}</b> today.` : 'No nervous-system check-in yet today.',
+      focus: 'A few minutes of daily down-regulation is the multiplier behind sleep, digestion, and blood sugar.'
+    },
+    supps:{
+      covers:'Targeted support — one at a time, after the foundations hold',
+      status: titr ? `Titrating <b>${titr.name}</b>, day ${titr.day||1}.` : (supps.length?`<b>${supps.length}</b> in your routine.`:'No supplements yet.'),
+      focus: 'One at a time, lowest dose, step up slowly. Foundations outrank any bottle.'
+    }
   };
-  // Rest
-  reads.rest={
-    status: a.avgSleep ? `Sleeping <b>${a.avgSleep}h</b> on average this week.` : 'No sleep logged yet this week.',
-    focus: (a.avgSleep&&a.avgSleep<7) ? 'Protect the 10pm window — the hours before midnight count double for recovery and hormones.' : 'Hold the rhythm. A consistent bedtime is worth more than any single long night.'
-  };
-  // Exercise
-  reads.exercise={
-    status: `<b>${a.workouts}</b> session${a.workouts===1?'':'s'} logged this week.`,
-    focus: 'Match intensity to recovery — on rough-sleep weeks, ease the load before pushing. Consistency beats intensity.'
-  };
-  // Stress
-  reads.stress={
-    status: ss ? `You checked in feeling <b>${ss}</b> today.` : 'No nervous-system check-in yet today.',
-    focus: 'A few minutes of daily down-regulation is the multiplier behind sleep, digestion, and blood sugar.'
-  };
-  // Supps
-  reads.supps={
-    status: titr ? `Titrating <b>${titr.name}</b>, day ${titr.day||1}.` : (supps.length?`<b>${supps.length}</b> in your routine.`:'No supplements yet.'),
-    focus: 'One at a time, lowest dose, step up slowly. Foundations outrank any bottle.'
-  };
-  return reads;
 }
 function rDressSummary(){
   const d=_dressData();
   const reads=_dressReads(d);
   const t=d.t, tm=d.tm;
   const readCard=(label,color,iconPath,r,page)=>`<div class="card">
-    <div style="display:flex;align-items:center;gap:11px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:6px">
       <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></div>
-      <div style="flex:1;min-width:0"><h4 style="font-size:15px;font-weight:700">${label}</h4></div>
+      <div style="flex:1;min-width:0"><h4 style="font-size:15px;font-weight:700">${label}</h4><div style="font-size:11px;color:var(--sub);margin-top:1px">${r.covers}</div></div>
       <button class="mk-link" onclick="goPage('${page}')">Open</button>
     </div>
-    <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:5px">${r.status}</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.5;margin:7px 0 5px">${r.status}</div>
     <div style="font-size:12.5px;color:var(--sub);line-height:1.5"><b style="color:var(--text)">Focus:</b> ${r.focus}</div>
   </div>`;
   let h=`<div style="padding:0 0 24px">
@@ -9305,23 +9315,21 @@ function rDressSummary(){
     <div class="fdn-focus" style="margin-bottom:14px">
       <span class="kicker">Your program at a glance</span>
       <h3>${d.name?d.name+'’s story':'Your story'}</h3>
-      <p>Working toward ${d.goal}. A plain-language read on all five pillars — yours to show a coach, a doctor, or just yourself.</p>
+      <p>Working toward ${d.goal}. A plain-language read on all five pillars — yours to show a coach, a practitioner, or just yourself.</p>
     </div>`;
   if(d.ns&&d.ns.pattern){
     h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Systems under stress</span>
-      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${d.ns.pattern}</div>
+      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${_nsDisplayName(d.ns.pattern)}</div>
       ${d.lever?`<div style="font-size:13px;color:var(--sub);line-height:1.55"><b style="color:var(--text)">First lever:</b> ${d.lever.title} — ${d.lever.body}</div>`:''}</div>`;
   } else {
     h+=`<div class="card" onclick="_assessPage='hub';goPage('assess')" style="cursor:pointer"><div style="font-size:13px;color:var(--sub);line-height:1.55">Take the assessments to see which of your systems are working hardest — and your first lever.</div></div>`;
   }
-  // Per-pillar R&R reads (status + focus), not launchers
   h+=`<div class="ct" style="padding:6px 3px 8px">Where each pillar stands</div>`;
   h+=readCard('Diet','var(--green)','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>',reads.diet,'food');
   h+=readCard('Rest','var(--blue)','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>',reads.rest,'rest');
   h+=readCard('Exercise','var(--green)','<path d="M3 12h4l3-7 4 14 3-7h4"/>',reads.exercise,'workout');
   h+=readCard('Stress','var(--purple)','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>',reads.stress,'recovery');
   h+=readCard('Supplements','var(--green)','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>',reads.supps,'supps');
-  // Your numbers
   const sleepWin=(tm.bed&&tm.wake)?`${_fmtClock(new Date(0,0,0,+tm.bed.split(':')[0],+tm.bed.split(':')[1]))}–${_fmtClock(new Date(0,0,0,+tm.wake.split(':')[0],+tm.wake.split(':')[1]))}`:'10pm–6am';
   const numRow=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);font-size:13px"><span style="color:var(--sub)">${k}</span><span style="font-weight:700">${v}</span></div>`;
   h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Your numbers</span><div style="margin-top:4px">
@@ -9331,7 +9339,7 @@ function rDressSummary(){
     ${numRow('Sleep window',sleepWin)}
     ${numRow('Blood sugar (pre-meal)','80–90 mg/dL')}
   </div></div>`;
-  h+=`<button class="btn btn-g btn-f" style="margin-top:2px" onclick="_copyDressSummary()">Copy summary to share with your doctor</button>
+  h+=`<button class="btn btn-g btn-f" style="margin-top:2px" onclick="_copyDressSummary()">Copy summary to share with your practitioner</button>
     <button class="btn btn-s btn-f" style="margin-top:8px;color:var(--text)" onclick="goPage('detective')">Ask the Detective about your plan</button>
   </div>`;
   document.getElementById('page-summary').innerHTML=h;
@@ -9343,10 +9351,10 @@ function _copyDressSummary(){
     const lines=[];
     lines.push('METASTORY — DRESS SUMMARY'+(d.name?(' · '+d.name):''));
     lines.push('Goal: '+d.goal);
-    if(d.ns&&d.ns.pattern){lines.push('');lines.push('Systems under stress: '+d.ns.pattern);if(d.lever)lines.push('First lever: '+d.lever.title+' — '+strip(d.lever.body));}
+    if(d.ns&&d.ns.pattern){lines.push('');lines.push('Systems under stress: '+_nsDisplayName(d.ns.pattern));if(d.lever)lines.push('First lever: '+d.lever.title+' — '+strip(d.lever.body));}
     lines.push('');lines.push('THE FIVE PILLARS');
     [['Diet',reads.diet],['Rest',reads.rest],['Exercise',reads.exercise],['Stress',reads.stress],['Supplements',reads.supps]].forEach(([l,r])=>{
-      lines.push('• '+l+': '+strip(r.status)+' Focus: '+strip(r.focus));
+      lines.push('• '+l+' ('+r.covers+'): '+strip(r.status)+' Focus: '+strip(r.focus));
     });
     lines.push('');lines.push('NUMBERS');
     lines.push('Protein '+(t.p||'—')+'g/day · Calories '+(t.k||'—')+' · Water '+(t.w||'—')+'oz · Blood sugar 80–90 mg/dL pre-meal');
