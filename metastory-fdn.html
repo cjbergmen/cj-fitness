@@ -436,7 +436,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-top{display:flex;align-items:center;gap:10px}
 .mk-burger{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0}
 .mk-word{flex:1;text-align:center;font-family:var(--font-serif);font-size:18px;font-weight:500;letter-spacing:.02em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mk-day{width:34px;height:34px;border-radius:50%;border:2px solid var(--purple);background:none;color:var(--text);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0}
+.mk-today-btn{border-radius:999px;border:1.5px solid var(--purple);background:none;color:var(--text);font-size:12px;font-weight:700;cursor:pointer;flex:none;padding:7px 14px;white-space:nowrap;font-family:var(--font-sans)}
+.mk-today-btn:active{background:rgba(183,186,167,.25)}
 .mk-datebar{display:flex;align-items:center;gap:6px;margin-top:9px}
 .mk-dnav{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;font-size:14px;cursor:pointer;line-height:1}
 .mk-datebar #date-label{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--sub)}
@@ -505,7 +506,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
       <div class="mk-word" id="hdr-title">Metastory Health</div>
-      <button class="mk-day" id="hdr-day" onclick="goToday()" title="Jump to today"><span id="hdr-day-num">·</span></button>
+      <button class="mk-today-btn" id="hdr-day" onclick="goToday();goPage('today')" title="Today">Today</button>
     </div>
     <div class="mk-datebar">
       <button class="mk-dnav" onclick="shiftDate(-1)">‹</button>
@@ -2578,7 +2579,6 @@ function renderHeader(){
   document.getElementById('date-label').textContent=label;
   document.getElementById('today-btn').style.display=isToday?'none':'inline-block';
   document.getElementById('hdr-badge').innerHTML=isTrain()?'<span class="badge bg">Training</span>':'<span class="badge bp">Rest</span>';
-  const _dn=document.getElementById('hdr-day-num');if(_dn)_dn.textContent=d.getDate();
 }
 
 // ── HEADER ────────────────────────────────────────────────────────────────────
@@ -9232,29 +9232,71 @@ function _firstLever(r){
 }
 
 /* ════════════ DRESS SUMMARY (one-page program overview) ════════════ */
-function rDressSummary(){
+function _avg7(){
+  let pSum=0,pN=0,slSum=0,slN=0,woN=0;
+  for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);
+    const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    try{const log=JSON.parse(lsGet('fl_'+k,'[]'))||[];if(log.length){pSum+=log.reduce((s,e)=>s+(+e.p||0),0);pN++;}}catch(e){}
+    try{const r=JSON.parse(lsGet('rest_'+k,'null'));if(r&&r.h){slSum+=r.h;slN++;}}catch(e){}
+    if(lsGet('wd_'+k,'0')==='1')woN++;
+  }
+  return {avgP:pN?Math.round(pSum/pN):0,avgSleep:slN?+(slSum/slN).toFixed(1):0,workouts:woN};
+}
+function _dressData(){
   let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
-  const name=p.name||'';
-  const goal=p.goal||'general wellness';
   let ns=null;try{ns=JSON.parse(lsGet('_assess_ns_result','null'));}catch(e){}
   const lever=(typeof _firstLever==='function'&&ns)?_firstLever(ns):null;
   const t=(typeof getTgt==='function')?getTgt():{};
-  const m=(typeof getMacros==='function')?getMacros():{};
-  const dietLine=(t&&t.p)?`Protein ${Math.round(m.p||0)} / ${t.p}g · ${Math.round(m.k||0)} / ${t.k} cal today`:'Log meals to track your plate balance.';
-  let sleep=null;try{sleep=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));}catch(e){}
-  const restLine=(sleep&&sleep.h)?`Last sleep ${sleep.h}h · target ~8h`:'Log last night’s sleep on the Rest tab.';
-  const streak=(typeof _exStreak==='function')?_exStreak():0;
-  const exLine=streak>0?`${streak}-day streak · intensity matched to recovery`:'Movement matched to your current capacity.';
-  const ss=lsGet('stress_'+viewDate,'');
-  const stressLine=ss?`Today you feel ${ss} — a practice is suggested for you`:'Check in for today’s suggested practice.';
+  const a=_avg7();
+  const ss=lsGet('stress_'+dk(),'');
   let supps=[];try{supps=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
   let titr=null;try{titr=JSON.parse(lsGet('_supp_titr','null'));}catch(e){}
-  const suppLine=titr?`Titrating ${titr.name} (day ${titr.day||1}) · one at a time`:(supps.length?`${supps.length} in your routine · foundations first`:'Foundations before bottles — add when ready.');
-  let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress());if(fx&&fx.label)focus=fx.label;}}catch(e){}
-  const pillar=(label,line,page,iconPath,color)=>`<div class="mk-row" style="padding:11px 0;border-top:1px solid var(--border)" onclick="goPage('${page}')">
-    <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></div>
-    <div style="flex:1;min-width:0"><h4>${label}</h4><small>${line}</small></div>
-    <span style="color:var(--sub);margin-left:auto">›</span></div>`;
+  const tm=p.times||{};
+  return {p,ns,lever,t,a,ss,supps,titr,tm,goal:p.goal||'general wellness',name:p.name||''};
+}
+function _dressReads(d){
+  const {t,a,ss,supps,titr}=d;
+  const reads={};
+  // Diet
+  reads.diet={
+    status: a.avgP ? `Protein is averaging <b>${a.avgP}g/day</b>${t.p?` (target ${t.p}g)`:''}.` : 'Not enough logged yet to read your plate.',
+    focus: (a.avgP&&t.p&&a.avgP<t.p*0.85) ? 'Anchor breakfast with 30g+ protein — steadier energy, fewer afternoon cravings.' : 'Plate ratios are landing. Keep the post-meal check-ins going to learn your steadiest mix.'
+  };
+  // Rest
+  reads.rest={
+    status: a.avgSleep ? `Sleeping <b>${a.avgSleep}h</b> on average this week.` : 'No sleep logged yet this week.',
+    focus: (a.avgSleep&&a.avgSleep<7) ? 'Protect the 10pm window — the hours before midnight count double for recovery and hormones.' : 'Hold the rhythm. A consistent bedtime is worth more than any single long night.'
+  };
+  // Exercise
+  reads.exercise={
+    status: `<b>${a.workouts}</b> session${a.workouts===1?'':'s'} logged this week.`,
+    focus: 'Match intensity to recovery — on rough-sleep weeks, ease the load before pushing. Consistency beats intensity.'
+  };
+  // Stress
+  reads.stress={
+    status: ss ? `You checked in feeling <b>${ss}</b> today.` : 'No nervous-system check-in yet today.',
+    focus: 'A few minutes of daily down-regulation is the multiplier behind sleep, digestion, and blood sugar.'
+  };
+  // Supps
+  reads.supps={
+    status: titr ? `Titrating <b>${titr.name}</b>, day ${titr.day||1}.` : (supps.length?`<b>${supps.length}</b> in your routine.`:'No supplements yet.'),
+    focus: 'One at a time, lowest dose, step up slowly. Foundations outrank any bottle.'
+  };
+  return reads;
+}
+function rDressSummary(){
+  const d=_dressData();
+  const reads=_dressReads(d);
+  const t=d.t, tm=d.tm;
+  const readCard=(label,color,iconPath,r,page)=>`<div class="card">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:8px">
+      <div class="mk-meal-ic" style="background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></div>
+      <div style="flex:1;min-width:0"><h4 style="font-size:15px;font-weight:700">${label}</h4></div>
+      <button class="mk-link" onclick="goPage('${page}')">Open</button>
+    </div>
+    <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:5px">${r.status}</div>
+    <div style="font-size:12.5px;color:var(--sub);line-height:1.5"><b style="color:var(--text)">Focus:</b> ${r.focus}</div>
+  </div>`;
   let h=`<div style="padding:0 0 24px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <button onclick="goPage('today')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0">←</button>
@@ -9262,29 +9304,57 @@ function rDressSummary(){
     </div>
     <div class="fdn-focus" style="margin-bottom:14px">
       <span class="kicker">Your program at a glance</span>
-      <h3>${name?name+'’s story':'Your story'}</h3>
-      <p>Working toward ${goal}. Your whole program — the five daily pillars — on one page. Show it to a coach, a doctor, or just yourself.</p>
+      <h3>${d.name?d.name+'’s story':'Your story'}</h3>
+      <p>Working toward ${d.goal}. A plain-language read on all five pillars — yours to show a coach, a doctor, or just yourself.</p>
     </div>`;
-  if(ns&&ns.pattern){
+  if(d.ns&&d.ns.pattern){
     h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Systems under stress</span>
-      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${ns.pattern}</div>
-      ${lever?`<div style="font-size:13px;color:var(--sub);line-height:1.55"><b style="color:var(--text)">First lever:</b> ${lever.title} — ${lever.body}</div>`:''}</div>`;
+      <div style="font-size:16px;font-weight:700;margin:5px 0 4px">${d.ns.pattern}</div>
+      ${d.lever?`<div style="font-size:13px;color:var(--sub);line-height:1.55"><b style="color:var(--text)">First lever:</b> ${d.lever.title} — ${d.lever.body}</div>`:''}</div>`;
   } else {
     h+=`<div class="card" onclick="_assessPage='hub';goPage('assess')" style="cursor:pointer"><div style="font-size:13px;color:var(--sub);line-height:1.55">Take the assessments to see which of your systems are working hardest — and your first lever.</div></div>`;
   }
-  h+=`<div class="card"><span class="kicker" style="color:var(--sub)">The five daily pillars</span>
-    ${pillar('Diet',dietLine,'food','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>','var(--green)')}
-    ${pillar('Rest',restLine,'rest','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>','var(--blue)')}
-    ${pillar('Exercise',exLine,'workout','<path d="M3 12h4l3-7 4 14 3-7h4"/>','var(--green)')}
-    ${pillar('Stress',stressLine,'recovery','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>','var(--purple)')}
-    ${pillar('Supplements',suppLine,'supps','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','var(--green)')}
-  </div>`;
-  if(focus){
-    h+=`<div class="card" style="background:rgba(183,186,167,.18);border-color:var(--purple)"><span class="kicker" style="color:#6d7868">This week's focus</span><div style="font-size:14px;font-weight:700;margin-top:4px">${focus}</div></div>`;
-  }
-  h+=`<button class="btn btn-g btn-f" style="margin-top:4px" onclick="goPage('detective')">Ask the Detective about your plan</button>
+  // Per-pillar R&R reads (status + focus), not launchers
+  h+=`<div class="ct" style="padding:6px 3px 8px">Where each pillar stands</div>`;
+  h+=readCard('Diet','var(--green)','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>',reads.diet,'food');
+  h+=readCard('Rest','var(--blue)','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>',reads.rest,'rest');
+  h+=readCard('Exercise','var(--green)','<path d="M3 12h4l3-7 4 14 3-7h4"/>',reads.exercise,'workout');
+  h+=readCard('Stress','var(--purple)','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>',reads.stress,'recovery');
+  h+=readCard('Supplements','var(--green)','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>',reads.supps,'supps');
+  // Your numbers
+  const sleepWin=(tm.bed&&tm.wake)?`${_fmtClock(new Date(0,0,0,+tm.bed.split(':')[0],+tm.bed.split(':')[1]))}–${_fmtClock(new Date(0,0,0,+tm.wake.split(':')[0],+tm.wake.split(':')[1]))}`:'10pm–6am';
+  const numRow=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);font-size:13px"><span style="color:var(--sub)">${k}</span><span style="font-weight:700">${v}</span></div>`;
+  h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Your numbers</span><div style="margin-top:4px">
+    ${numRow('Protein target',(t.p||'—')+'g/day')}
+    ${numRow('Calorie target',(t.k||'—')+' kcal')}
+    ${numRow('Water target',(t.w||'—')+' oz')}
+    ${numRow('Sleep window',sleepWin)}
+    ${numRow('Blood sugar (pre-meal)','80–90 mg/dL')}
+  </div></div>`;
+  h+=`<button class="btn btn-g btn-f" style="margin-top:2px" onclick="_copyDressSummary()">Copy summary to share with your doctor</button>
+    <button class="btn btn-s btn-f" style="margin-top:8px;color:var(--text)" onclick="goPage('detective')">Ask the Detective about your plan</button>
   </div>`;
   document.getElementById('page-summary').innerHTML=h;
+}
+function _copyDressSummary(){
+  try{
+    const d=_dressData(); const reads=_dressReads(d); const t=d.t;
+    const strip=s=>String(s||'').replace(/<[^>]+>/g,'');
+    const lines=[];
+    lines.push('METASTORY — DRESS SUMMARY'+(d.name?(' · '+d.name):''));
+    lines.push('Goal: '+d.goal);
+    if(d.ns&&d.ns.pattern){lines.push('');lines.push('Systems under stress: '+d.ns.pattern);if(d.lever)lines.push('First lever: '+d.lever.title+' — '+strip(d.lever.body));}
+    lines.push('');lines.push('THE FIVE PILLARS');
+    [['Diet',reads.diet],['Rest',reads.rest],['Exercise',reads.exercise],['Stress',reads.stress],['Supplements',reads.supps]].forEach(([l,r])=>{
+      lines.push('• '+l+': '+strip(r.status)+' Focus: '+strip(r.focus));
+    });
+    lines.push('');lines.push('NUMBERS');
+    lines.push('Protein '+(t.p||'—')+'g/day · Calories '+(t.k||'—')+' · Water '+(t.w||'—')+'oz · Blood sugar 80–90 mg/dL pre-meal');
+    lines.push('');lines.push('Education & self-care guidance — not medical diagnosis or treatment.');
+    const text=lines.join('\n');
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>showToast('Summary copied — paste it anywhere')).catch(()=>showToast('Could not copy on this device'));}
+    else{showToast('Copy not supported on this device');}
+  }catch(e){showToast('Could not build summary');}
 }
 
 /* ════════════ ONBOARDING: daily-rhythm times → routine ════════════ */
