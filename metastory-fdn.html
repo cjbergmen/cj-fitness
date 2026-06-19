@@ -2217,7 +2217,14 @@ function buildExCard(e,idx,num,col,wdone){
   }
 
   // ── How-to back side ──────────────────────────────────────
-  const how=EX_HOW[name];
+  // Source priority: curated EX_HOW library → how-to fields embedded on the
+  // exercise object (AI-generated plans carry steps/key/muscles) → a minimal
+  // how-to built from the one-line cue so every exercise has *something*.
+  let how=EX_HOW[name];
+  if(!how && e){
+    const eSteps=Array.isArray(e.steps)?e.steps:(e.i?[e.i]:[]);
+    if(eSteps.length||e.key||e.muscles) how={muscles:e.muscles||'',steps:eSteps,key:e.key||''};
+  }
   if(_exFlipped[idx]&&how){
     let bh=`<div class="wo-ex-card" id="wo-ex-${idx}">`;
     bh+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -8009,7 +8016,7 @@ async function wizGenerate(){
       if(strengthDays.length>0){
         const eqMap={bodyweight:'bodyweight only',dumbbells:'dumbbells only (10–30 lb range)',home_gym:'dumbbells and a barbell',gym:'full gym with machines and cables'};
         const eqLabel=eqMap[p.equipment]||'dumbbells';
-        const exPrompt=`You are a certified strength and conditioning coach. Generate a complete dumbbell-based workout plan for each training day listed.
+        const exPrompt=`You are a certified strength and conditioning coach. Generate a complete workout plan for each training day listed, using ONLY the equipment available to this user (see Equipment below).
 
 User profile:
 - Goal: ${p.goal||'muscle'}
@@ -8027,11 +8034,11 @@ Return ONLY a valid JSON array — no markdown, no explanation. Each element:
 {
   "day": <number matching above>,
   "ex": [
-    {"n":"Exercise Name","tag":"3 × 10–12","i":"one-line coaching cue","rest":"90 sec","muscles":"primary muscles"},
+    {"n":"Exercise Name","tag":"3 × 10–12","i":"one-line coaching cue","rest":"90 sec","muscles":"primary muscles · secondary","steps":["setup/start position","the movement, with tempo","the return + what to feel"],"key":"the single most important form cue or mistake to avoid"},
     ... (4–6 main exercises, compound first)
   ],
   "pm": [
-    {"n":"Accessory Name","tag":"2 × 15","i":"cue","rest":"60 sec"},
+    {"n":"Accessory Name","tag":"2 × 15","i":"cue","rest":"60 sec","muscles":"primary muscles","steps":["start","movement","return"],"key":"key cue"},
     ... (2–3 isolation/pump exercises)
   ]
 }
@@ -8041,7 +8048,8 @@ Rules:
 - Sequence: compound movements first, isolation last
 - Match sets/reps to the goal (muscle = hypertrophy rep ranges, strength = lower reps heavier, fat_loss = higher reps shorter rest)
 - Avoid exercises that stress the listed injury areas
-- Be specific with exercise names (e.g. "Incline DB Press" not "chest press")`;
+- Be specific with exercise names (e.g. "Incline DB Press" not "chest press")
+- EVERY exercise (ex and pm) MUST include "muscles", "steps" (exactly 3 concise instructional steps), and "key" (one form cue) so the user has a complete how-to. Keep steps clear and specific to the actual movement.`;
 
         const exRes=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
           method:'POST',headers:{'Content-Type':'application/json'},
