@@ -8822,6 +8822,13 @@ const REST_TYPES=[
   {k:'spiritual',n:'Spiritual', d:'Meaning, belonging, connection to something larger.'},
 ];
 const REST_TYPE_COLORS={physical:'var(--green)',mental:'var(--blue)',sensory:'var(--purple)',creative:'#b98a5e',emotional:'var(--red)',social:'#6d8aa0',spiritual:'#8a7da6'};
+// When the Sabbath layer is ON, spiritual rest must be EXPLICITLY Christian,
+// grounded in these named sources (priority order). Used in the AI prompt.
+const CHRISTIAN_REST_GUIDANCE=`Make every spiritual rest practice EXPLICITLY CHRISTIAN — not generic spirituality, mindfulness, or "self-care." Ground each one in these sources, in this priority:
+1. Practicing the Way (John Mark Comer) — the practices / rule of life, especially: Sabbath (a 24-hour day to STOP, REST, DELIGHT, and WORSHIP God), Silence & Solitude, Prayer, Slowing, and Simplicity.
+2. The Desert Fathers & Mothers (the early Christian Abbas and Ammas) — solitude, interior silence and stillness (hesychia), withdrawal, watchfulness, manual work woven with unceasing prayer, and the Jesus Prayer ("Lord Jesus Christ, Son of God, have mercy on me, a sinner").
+3. The Book of Common Prayer — fixed-hour prayer / the Daily Office: Morning Prayer, Midday Prayer, Evening Prayer, and Compline (night prayer); the collects; praying the Psalms.
+Name practices CONCRETELY and by source — e.g. "Pray Compline from the Book of Common Prayer before bed," "Keep a weekly Sabbath as in Practicing the Way — a 24-hour stop to rest and delight in God," "15 minutes of silent solitude with the Jesus Prayer, in the way of the desert mothers and fathers." Use the ESV for any Scripture. Tone: warm, invitational, unhurried — an invitation into rest in God, never legalistic, never shaming.`;
 let _restSetupOpen=false, _restGenLoading=false, _restGenErr='';
 let _restSetup={work:'',depleted:[],schedule:'',sabbath:false};
 function _restProfileGet(){try{return JSON.parse(lsGet('_restProfile','null'));}catch(e){return null;}}
@@ -8852,7 +8859,7 @@ function _restRhythmsHTML(){
       <span class="kicker">Your Rest Rhythms</span>
       <div style="display:flex;gap:12px"><button class="mk-link" onclick="restRegenerate()">Regenerate</button><button class="mk-link" onclick="openRestSetup()">Redo</button></div>
     </div>
-    <p style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-bottom:6px">Built for ${plan.work==='hands'?'hands-on work — so your rest leans mental and quiet':plan.work==='mind'?'mind-heavy work — so your rest leans physical and hands-on':'a mix of mind and hands'}.${plan.sabbath?' Includes a Sabbath rhythm.':''}</p>`;
+    <p style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-bottom:6px">Built for ${plan.work==='hands'?'hands-on work — so your rest leans mental and quiet':plan.work==='mind'?'mind-heavy work — so your rest leans physical and hands-on':'a mix of mind and hands'}.${plan.sabbath?' Includes Christian rest practices — Sabbath, silence, and fixed-hour prayer.':''}</p>`;
   cad.forEach(([key,label,sub])=>{
     const items=Array.isArray(plan[key])?plan[key]:[];
     if(!items.length)return;
@@ -8899,7 +8906,7 @@ function _restSetupHTML(){
     <div style="display:flex;gap:8px">${schedOpt('low','Very little')}${schedOpt('some','Some')}${schedOpt('lots','A lot')}</div>
     <div onclick="restToggleSabbath()" style="display:flex;align-items:flex-start;gap:10px;margin-top:16px;cursor:pointer">
       <div class="chk-box ${p.sabbath?'on':''}" style="margin-top:1px">${p.sabbath?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-      <div><div style="font-size:13px;font-weight:700">Include a spiritual / Sabbath dimension</div><div style="font-size:11.5px;color:var(--sub);line-height:1.4">Frames weekly and yearly rest as a sacred practice, with the occasional Scripture (ESV).</div></div>
+      <div><div style="font-size:13px;font-weight:700">Include Christian rest practices</div><div style="font-size:11.5px;color:var(--sub);line-height:1.4">Sabbath, silence &amp; solitude, and fixed-hour prayer — drawing on Practicing the Way, the desert fathers &amp; mothers, and the Book of Common Prayer (ESV).</div></div>
     </div>
     ${_restGenErr?`<div style="font-size:12px;color:var(--red);margin-top:10px">${_esc(_restGenErr)}</div>`:''}
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -8927,7 +8934,7 @@ async function restGenerate(){
   const prompt=`You are a trauma-informed wellness coach helping someone design rhythms of rest, grounded in Dr. Saundra Dalton-Smith's seven types of rest (physical, mental, sensory, creative, emotional, social, spiritual) and the principle of REST BY CONTRAST: people who work with their MIND rest best by doing something physical/with their hands, and people who work with their HANDS/body rest best with something mental, quiet, or still.
 
 This person works primarily with ${workTxt}. They feel most depleted in these rest types: ${p.depleted.length?p.depleted.join(', '):'unsure — infer from their work type'}. Their control over their schedule is: ${p.schedule||'some'}.
-${p.sabbath?'Include a spiritual / Sabbath dimension: frame the weekly and annual rhythms around rest as a sacred, restorative practice; you may include ONE short ESV scripture reference total, only where it fits naturally.':'Keep it fully secular — no religious content.'}
+${p.sabbath?CHRISTIAN_REST_GUIDANCE+'\nWeave these Christian practices across all four cadences (e.g. daily fixed-hour prayer or the Jesus Prayer; a weekly Sabbath; monthly solitude/silence; an annual silent retreat).':'Keep it fully secular — no religious content.'}
 
 ${WHOLE_BODY_LENS}
 
