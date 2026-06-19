@@ -2227,7 +2227,8 @@ function buildExCard(e,idx,num,col,wdone){
       </div>
       <button onclick="flipExCard(${idx},event)" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text);font-size:11px;font-weight:600;padding:5px 10px;cursor:pointer;white-space:nowrap">← Log sets</button>
     </div>`;
-    bh+=_exAnim(name);
+    // Exercise demo animation intentionally omitted for now — text descriptions only.
+    // Re-add here (as <video> from the purchased ExerciseDB Pro set) once there are paid users.
     if(how.muscles){bh+=`<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${col};background:${col}18;padding:6px 9px;border-radius:7px;margin-bottom:10px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M3 9v6M21 9v6M7 8v8M17 8v8"/></svg>${how.muscles}</div>`;}
     bh+=`<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">`;
     how.steps.forEach((s,si)=>{
