@@ -1022,6 +1022,11 @@ function fbSyncWater(date, amount){
 function fbSyncWorkoutLog(date, data){
   fbSet('workoutLogs', date, { exercises: data, updated: Date.now() });
 }
+// Sleep syncs to its own collection so it can also be written by the Health
+// Auto Export bridge (worker → sleepLogs/<date>) and pulled back on any device.
+function fbSyncSleep(date, data){
+  fbSet('sleepLogs', date, { h: data.h||0, bed: data.bed||'', wake: data.wake||'', source: data.source||'manual', updated: Date.now() });
+}
 function fbSyncSettings(){
   if(!fbUser || !fbDb) return;
   try {
@@ -1087,6 +1092,19 @@ async function fbPullAll(){
         }
       }
     });
+    // Pull sleep logs (manual entries + anything pushed by the Health Auto Export bridge)
+    try {
+      const slSnap = await fbDb.collection('users').doc(uid).collection('sleepLogs').get();
+      slSnap.forEach(doc => {
+        const d = doc.data(); const date = doc.id;
+        if(!(d && d.h > 0)) return;
+        let local = null; try { local = JSON.parse(lsGet('rest_'+date,'null')); } catch(e){}
+        // Cloud wins if there's no local entry, local has no hours, or cloud is newer
+        if(!local || !(local.h>0) || (d.updated||0) > (local.updated||0)) {
+          lsSet('rest_'+date, JSON.stringify({h:d.h, bed:d.bed||'', wake:d.wake||'', source:d.source||'manual', updated:d.updated||Date.now()}));
+        }
+      });
+    } catch(e){}
     // Pull settings
     const userDoc = await fbDb.collection('users').doc(uid).get();
     if(userDoc.exists) {
@@ -8728,8 +8746,8 @@ function saveRest(){
   const h=parseFloat(document.getElementById('rest-h').value||'0')||0;
   const bed=document.getElementById('rest-bed').value||'';
   const wake=document.getElementById('rest-wake').value||'';
-  lsSet('rest_'+viewDate,JSON.stringify({h,bed,wake}));
-  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  lsSet('rest_'+viewDate,JSON.stringify({h,bed,wake,updated:Date.now()}));
+  try{if(typeof fbSyncSleep==='function')fbSyncSleep(viewDate,{h,bed,wake,source:'manual'});}catch(e){}
   showToast('Sleep logged'); rRest();
 }
 function rRest(){
