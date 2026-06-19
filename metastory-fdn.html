@@ -3403,7 +3403,8 @@ function _dayFacts(d){
   const isT=_trainDaySet().includes(d.getDay());
   const tgt=_tgtFor(isT);
   const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
-    ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0};
+    ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0,
+    restDone:0,restPlanned:0,restAny:0};
   // Workout done = "Mark Complete" flag OR any logged sets (lenient, matches week heatmap)
   if(lsGet('wd_'+key,'0')==='1')f.woAny=1;
   else{try{const wl=JSON.parse(lsGet('wl_'+key,'[]'));if(Array.isArray(wl)&&wl.length>0)f.woAny=1;}catch(e){}}
@@ -3433,6 +3434,17 @@ function _dayFacts(d){
     f.suppSched=inst;f.suppTaken=Math.min(sl.length,inst);
     if(sl.length)f.suppDay=1;
   }
+  // Rest practices — daily slots checked off (morning/midday/evening)
+  try{
+    const rr=JSON.parse(lsGet('_restRhythms','null'));
+    const dailyN=(rr&&Array.isArray(rr.daily))?rr.daily.length:0;
+    if(dailyN>0){
+      f.restPlanned=dailyN;
+      let rd=[];try{rd=JSON.parse(lsGet('restdone_'+key,'[]'))||[];}catch(e){}
+      f.restDone=Math.min(rd.length,dailyN);
+      if(rd.length)f.restAny=1;
+    }
+  }catch(e){}
   return f;
 }
 function _sumFacts(days){
@@ -3457,12 +3469,13 @@ const _PROG_SCORERS={
     const reg=t.moodReg/t.moodTot;
     return Math.round((t.pairs?reg*0.7+(t.improved/t.pairs)*0.3:reg)*100);},
   supps:t=>t.suppSched?Math.round(t.suppTaken/t.suppSched*100):null,
+  rest:t=>t.restPlanned?Math.round(t.restDone/t.restPlanned*100):null,
 };
 const _PROG_WEIGHTS={
-  muscle:     {workout:.30,food:.25,water:.10,mood:.08,ctx:.07,supps:.10,assess:.10},
-  fat_loss:   {workout:.25,food:.30,water:.10,mood:.08,ctx:.10,supps:.07,assess:.10},
-  fitness:    {workout:.30,food:.22,water:.12,mood:.08,ctx:.08,supps:.10,assess:.10},
-  maintenance:{workout:.20,food:.20,water:.12,mood:.12,ctx:.12,supps:.12,assess:.12}
+  muscle:     {workout:.28,food:.24,water:.10,mood:.07,ctx:.06,supps:.09,rest:.08,assess:.08},
+  fat_loss:   {workout:.24,food:.28,water:.10,mood:.07,ctx:.09,supps:.06,rest:.08,assess:.08},
+  fitness:    {workout:.28,food:.20,water:.11,mood:.07,ctx:.07,supps:.09,rest:.10,assess:.08},
+  maintenance:{workout:.18,food:.18,water:.11,mood:.11,ctx:.10,supps:.10,rest:.12,assess:.10}
 };
 const GOAL_LABELS={muscle:'Build Muscle & Strength',fat_loss:'Lose Fat & Get Lean',fitness:'Fitness & Endurance',maintenance:'Maintain & Feel Great'};
 function computeProgress(days){
@@ -3481,6 +3494,7 @@ function computeProgress(days){
     mood:_sinceFirst(all,f=>f.ckAny>0),
     ctx:_sinceFirst(all,f=>f.ckAny>0),
     supps:_sinceFirst(all,f=>f.suppDay>0),
+    rest:_sinceFirst(all,f=>f.restAny>0),
     assess:N
   };
   const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
@@ -3516,6 +3530,7 @@ function computeProgress(days){
     {id:'mood',label:'Mood signal',what:'Meals ending calm, content or energized — plus meals that lifted your mood'},
     {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried'},
     {id:'supps',label:'Supplements',what:'Scheduled doses you took'},
+    {id:'rest',label:'Rest practices',what:'Daily rest practices you checked off (morning, midday, evening)'},
     {id:'assess',label:'Assessments',what:'Health assessments completed (builds your profile)'}
   ];
   const cats=defs.map(c=>{
@@ -3529,6 +3544,7 @@ function computeProgress(days){
     else if(c.id==='mood')detail=t.moodTot?t.moodReg+'/'+t.moodTot+' meals ended regulated'+(t.improved?' · '+t.improved+' lifted your mood':''):'No mood check-ins yet';
     else if(c.id==='ctx')detail=t.ctxTot?t.ctxGood+' of '+t.ctxTot+' check-ins':'No check-ins yet';
     else if(c.id==='supps')detail=t.suppSched?t.suppTaken+' of '+t.suppSched+' doses':'No supplements set up';
+    else if(c.id==='rest')detail=t.restPlanned?t.restDone+' of '+t.restPlanned+' rest practices done':'No rest practices yet';
     else if(c.id==='assess')detail=assessDone+'/3 complete';
     if(cd.score!==null&&c.id!=='assess'&&cd.win<14)detail+=' · early data ('+cd.win+(cd.win===1?' day':' days')+')';
     return {...c,score:cd.score,weight:W[c.id],conf:cd.conf,win:cd.win,trend:cd.trend,arrow:cd.arrow,detail,_t:t};
@@ -8873,18 +8889,25 @@ function _restRhythmsHTML(){
   h+=`</div>`;
   const cur=cad.find(c=>c[0]===_restCad);
   const items=Array.isArray(plan[_restCad])?plan[_restCad]:[];
-  // One bigger practice card
-  const card=it=>{
+  // One bigger practice card, with a completion checkbox
+  const card=(it,cd,id)=>{
     const c=REST_TYPE_COLORS[it.type]||'var(--blue)';
     let body=it.practice!=null?it.practice:(it.what||'');
     if(Array.isArray(body))body=body.join('\n');
     const bodyHtml=_esc(String(body)).replace(/\n/g,'<br>');
-    return `<div style="border-left:3px solid ${c};background:var(--surface2);border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:10px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:17px;font-weight:800">${_esc(it.title||'')}</span>
-        <span style="font-size:10px;font-weight:700;color:${c};background:${c}1e;padding:2px 8px;border-radius:8px">${_restTypeName(it.type)}</span>
+    const done=_restDoneFor(cd).includes(id);
+    const chk=`<div class="chk-box ${done?'on':''}" onclick="restToggleDone('${cd}','${id}')" style="cursor:pointer;flex:none;margin-top:2px">${done?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>`;
+    return `<div style="border-left:3px solid ${c};background:var(--surface2);border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:10px;opacity:${done?0.62:1}">
+      <div style="display:flex;align-items:flex-start;gap:11px">
+        ${chk}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-size:17px;font-weight:800">${_esc(it.title||'')}</span>
+            <span style="font-size:10px;font-weight:700;color:${c};background:${c}1e;padding:2px 8px;border-radius:8px">${_restTypeName(it.type)}</span>
+          </div>
+          ${bodyHtml?`<div style="font-size:14.5px;line-height:1.7;white-space:pre-line">${bodyHtml}</div>`:''}
+        </div>
       </div>
-      ${bodyHtml?`<div style="font-size:14.5px;line-height:1.7;white-space:pre-line">${bodyHtml}</div>`:''}
     </div>`;
   };
   if(_restCad==='daily'){
@@ -8897,11 +8920,11 @@ function _restRhythmsHTML(){
     order.forEach(k=>{const on=curSlot===k;h+=`<button onclick="restSetSlot('${k}')" style="flex:1;padding:6px 2px;border:1px solid ${on?'var(--blue)':'var(--border)'};border-radius:8px;background:${on?'rgba(122,154,171,.15)':'var(--surface2)'};color:${on?'var(--blue)':'var(--sub)'};font-size:11.5px;font-weight:700;cursor:pointer">${lbl[k]}</button>`;});
     h+=`</div>`;
     const it=map[curSlot];
-    h+= it?card(it):`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${lbl[curSlot].toLowerCase()} practice yet. Tap Regenerate to refresh.</div>`;
+    h+= it?card(it,'daily',curSlot):`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${lbl[curSlot].toLowerCase()} practice yet. Tap Regenerate to refresh.</div>`;
   } else {
     h+=`<div style="font-size:11.5px;color:var(--sub);margin-bottom:10px">${cur?cur[2]:''}</div>`;
     if(!items.length)h+=`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${_restCad} practices in this plan. Tap Regenerate to refresh.</div>`;
-    else items.forEach(it=>{h+=card(it);});
+    else items.forEach((it,idx)=>{h+=card(it,_restCad,String(idx));});
   }
   if(_restGenErr)h+=`<div style="font-size:12px;color:var(--red);margin-top:8px">${_esc(_restGenErr)}</div>`;
   h+=`</div>`;
@@ -8948,6 +8971,25 @@ function restSetSchedule(v){_restSetup.schedule=v;rRest();}
 function restSetSpiritual(v){_restSetup.spiritual=v;rRest();}
 function restSetCad(c){_restCad=c;rRest();}
 function restSetSlot(s){_restSlot=s;rRest();}
+// Completion is tracked per cadence-period: daily=today, weekly=Mon of this week,
+// monthly=this month, annual=this year. Daily completion feeds the Progress metric.
+function _restPeriodKey(cad){
+  const d=new Date();
+  if(cad==='weekly'){const t=new Date(d);t.setDate(t.getDate()-((t.getDay()+6)%7));return 'wk'+_dkOf(t);}
+  if(cad==='monthly')return 'mo'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(cad==='annual')return 'yr'+d.getFullYear();
+  return dk();
+}
+function _restDoneFor(cad){try{return JSON.parse(lsGet('restdone_'+_restPeriodKey(cad),'[]'))||[];}catch(e){return [];}}
+function restToggleDone(cad,id){
+  const k='restdone_'+_restPeriodKey(cad);
+  let d=_restDoneFor(cad);
+  const i=d.indexOf(id);
+  if(i>=0)d.splice(i,1);else d.push(id);
+  lsSet(k,JSON.stringify(d));
+  showToast(i>=0?'Unmarked':'Nice — rest counts');
+  rRest();
+}
 function restToggleDeplete(k){const d=_restSetup.depleted;const i=d.indexOf(k);if(i>=0)d.splice(i,1);else{if(d.length>=3){showToast('Pick up to 3');return;}d.push(k);}rRest();}
 function restRegenerate(){const p=_restProfileGet();if(!p){openRestSetup();return;}_restSetup={work:p.work,depleted:p.depleted||[],schedule:p.schedule||'',spiritual:p.spiritual||(p.sabbath?'christian':'none')};restGenerate();}
 
