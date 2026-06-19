@@ -1168,7 +1168,7 @@ async function autoGenRoutine(){
 "trainRoutine": array of 8-10 objects {t,a,n} — a realistic daily schedule for a TRAINING DAY. t=time/label (e.g. "Wake Up","Morning","Pre-Workout","Post-Workout","Lunch","Afternoon","Dinner","2 hrs before bed","Before Bed"), a=specific action tailored to their goal and diet, n=optional short coaching note (can be empty string). REQUIRED anchors — you MUST include all four: (1) first entry: Wake Up — drink water immediately before anything else; (2) second entry: Morning — 5-10 min of outdoor sunlight within first hour of waking; (3) near end: "2 hrs before bed" — stop eating, last meal; (4) final entry: "Before Bed" — no screens or use blue light glasses. Build the rest around training and their goals.
 "restRoutine": array of 7-9 objects {t,a,n} — same format but for a REST DAY. Same four required anchors. Lighter meals, recovery focus, no pre/post workout entries.
 Profile: name=${p.name||'User'}, goal=${goal}, bodyType=${p.bodyType||'mesomorph'}, diet=${p.diet||'no restrictions'}, weight=${p.weight||'unknown'}lbs, sex=${p.sex||'unknown'}, sleep=${p.sleep||'fair'}, injuries=${p.injuries||'none'}
-Make the routines specific and personal — reference their body type in meal timing and food choices (ectomorphs need more caloric density and carbs; endomorphs benefit from protein-first, lower-carb meals; mesomorphs get a balanced approach). No emoji in t or a fields.`;
+Make the routines specific and personal — reference their body type in meal timing and food choices (ectomorphs need more caloric density and carbs; endomorphs benefit from protein-first, lower-carb meals; mesomorphs get a balanced approach). In each note (n), where it fits naturally, include a brief why that connects the action to overall metabolic/whole-body health (one short clause, e.g. "morning light sets the sleep rhythm that powers the day"). No emoji in t or a fields.`;
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:1500}})
@@ -3615,6 +3615,8 @@ async function runWeeklyReview(){
     const fx=pickWeeklyFocus(pr);
     const prompt=`You are a trauma-informed functional health coach writing a short weekly note to a client. Warm, specific, encouraging — never shaming. Never mention AI, models, or data systems; write as their coach. Their goal: ${pr.goalLabel}. Stress: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
 
+${WHOLE_BODY_LENS}
+
 THIS WEEK'S FOCUS: ${fx.focus.label} — ${fx.focus.line}
 ${fx.quick?'QUICK WIN: '+fx.quick.label+' — '+fx.quick.line:''}
 
@@ -3625,11 +3627,11 @@ ${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, 
 - Gut assessment: ${st.gut?JSON.stringify(st.gut):'not taken'}
 - Amino acid assessment: ${st.aa?'taken':'not taken'}
 
-Write ONE single paragraph (4-6 sentences) that expands on the focus and quick win above: name a genuine win from the data, then make the focus and quick win feel doable and worth it this week. No lists, no headers.
+Write ONE single paragraph (4-6 sentences) that expands on the focus and quick win above: name a genuine win from the data, then make the focus and quick win feel doable and worth it this week. When you point to the focus habit, include a brief why that connects it to their whole-body/metabolic health (one short clause, e.g. "hydration helps digestion and recovery by…") so they feel how this one piece supports the whole. No lists, no headers.
 
 Respond ONLY with valid JSON, no markdown:
 {"paragraph":"the single paragraph","adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
-    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash-lite`,{
+    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})
     });
@@ -4273,6 +4275,9 @@ async function runAIPlanReview(){
     const rsSum = routineRS.slice(0,5).map(r=>r.a).join('; ') || 'standard rest day routine';
 
     const prompt = `You are a trauma-informed functional health coach. A client completed health assessments. Review their current plan and provide specific, NS-profile-informed recommendations.
+
+${WHOLE_BODY_LENS}
+In each "insight" field, include a brief why that ties the recommendation back to overall metabolic and functional health, so each piece is felt as part of the whole system.
 
 ASSESSMENT RESULTS:
 Nervous System Profile: ${nsResult.pattern||'unknown'}
@@ -8084,7 +8089,7 @@ Rules:
 "trainRoutine": array of 8-10 objects {t,a,n} — a realistic daily schedule for a TRAINING DAY. t=time/label (e.g. "Wake Up","Morning","Pre-Workout","Post-Workout","Lunch","Afternoon","Dinner","2 hrs before bed","Before Bed"), a=specific action tailored to their goal and diet, n=optional short coaching note (can be empty string). REQUIRED anchors — you MUST include all four: (1) first entry: Wake Up — drink water immediately before anything else; (2) second entry: Morning — 5-10 min of outdoor sunlight within first hour of waking; (3) near end: "2 hrs before bed" — stop eating, last meal; (4) final entry: "Before Bed" — no screens or use blue light glasses. Build the rest around training and their goals.
 "restRoutine": array of 7-9 objects {t,a,n} — same format but for a REST DAY. Same four required anchors. Lighter meals, recovery focus, no pre/post workout entries.
 Profile: name=${p.name||'User'}, goal=${p.goal}, bodyType=${p.bodyType||'mesomorph'}, diet=${p.diet}, allergens=${(p.allergens||[]).join(',')}, restrictions=${p.allergenNotes||'none'}, injuries=${p.injuries||'none'}, weight=${p.weight}lbs, sex=${p.sex||'unknown'}, sleep=${p.sleep||'fair'}
-Make the routines specific and personal — reference their goal, body type, diet preferences, and weight. For ectomorphs emphasize caloric density and carb timing; for endomorphs emphasize protein-first meals and limiting simple carbs; for mesomorphs use a balanced approach. Avoid generic filler. No emoji in t or a fields.`;
+Make the routines specific and personal — reference their goal, body type, diet preferences, and weight. For ectomorphs emphasize caloric density and carb timing; for endomorphs emphasize protein-first meals and limiting simple carbs; for mesomorphs use a balanced approach. In each note (n), where it fits naturally, include a brief why that connects the action to overall metabolic/whole-body health (one short clause). Avoid generic filler. No emoji in t or a fields.`;
       const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:2000}})
@@ -9042,6 +9047,11 @@ function appendDietExtras(){
     prompt+knowledge server-side into the Worker, paid Gemini key, per-user
     rate limits. Flagged for C.J.)
    ════════════════════════════════════════════════════════════════════════ */
+// Shared across EVERY AI surface in the app (Detective, Weekly Review, Plan Review,
+// routine generation). The throughline of the whole product: each small part
+// contributes to the whole — so always say briefly WHY a habit matters to the system.
+const WHOLE_BODY_LENS=`WHOLE-BODY LENS (apply in every response): the body is one connected system, and you can't spot-treat one piece at a time. Whenever you name a habit, metric, symptom, or recommendation, add a brief why that ties it back to the whole — one short, plain, concrete clause (e.g. "hydration helps digestion and muscle recovery by moving nutrients and clearing waste", "protein steadies blood sugar so energy and mood hold through the afternoon", "morning light sets the sleep rhythm that powers everything else"). Keep it to a clause or one sentence — never a lecture, never preachy. The quiet throughline of everything you say: strengthen the system, not isolated symptoms.`;
+
 const DET_SYS=`You are the Health Detective inside Metastory Health, a wellness app built on functional-health principles. You help people read their body's story — connecting their tracked data, check-ins, and assessment results into plain-language understanding and one good next step.
 
 WHO YOU ARE: a patient, warm, evidence-first guide. You think like a detective — clues, threads, patterns, never verdicts. You educate and equip; you NEVER diagnose, treat, prescribe, or interpret anything as a disease. You identify "healing opportunities" and "systems working hard." You are an automated companion; if asked, say so plainly and note a human coach is available in the app.
@@ -9212,7 +9222,7 @@ async function detSend(forced){
   _detHist.push({role:'assistant',text:'…'});_detRender();
   try{
     const transcript=_detHist.filter(m=>m.text!=='…').slice(-8).map(m=>(m.role==='user'?'User: ':'Detective: ')+m.text).join('\n');
-    const prompt=[DET_SYS,KB_CORE,_retrieveDeep(q),_gatesNote(),_detContext(),'CONVERSATION:\n'+transcript,'Reply as the Detective to the latest user message. Remember: ground in their data, one experiment, the footer lines.'].filter(Boolean).join('\n\n');
+    const prompt=[DET_SYS,WHOLE_BODY_LENS,KB_CORE,_retrieveDeep(q),_gatesNote(),_detContext(),'CONVERSATION:\n'+transcript,'Reply as the Detective to the latest user message. Remember: ground in their data, one experiment, a brief whole-body why, the footer lines.'].filter(Boolean).join('\n\n');
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:900,thinkingConfig:{thinkingBudget:0}}})
