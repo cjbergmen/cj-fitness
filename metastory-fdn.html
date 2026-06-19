@@ -8828,10 +8828,11 @@ const CHRISTIAN_REST_GUIDANCE=`Make every spiritual rest practice EXPLICITLY CHR
 1. Practicing the Way (John Mark Comer) — the practices / rule of life, especially: Sabbath (a 24-hour day to STOP, REST, DELIGHT, and WORSHIP God), Silence & Solitude, Prayer, Slowing, and Simplicity.
 2. The Desert Fathers & Mothers (the early Christian Abbas and Ammas) — solitude, interior silence and stillness (hesychia), withdrawal, watchfulness, manual work woven with unceasing prayer, and the Jesus Prayer ("Lord Jesus Christ, Son of God, have mercy on me, a sinner").
 3. The Book of Common Prayer — fixed-hour prayer / the Daily Office: Morning Prayer, Midday Prayer, Evening Prayer, and Compline (night prayer); the collects; praying the Psalms.
-Name practices CONCRETELY and by source — e.g. "Pray Compline from the Book of Common Prayer before bed," "Keep a weekly Sabbath as in Practicing the Way — a 24-hour stop to rest and delight in God," "15 minutes of silent solitude with the Jesus Prayer, in the way of the desert mothers and fathers." Use the ESV for any Scripture. Tone: warm, invitational, unhurried — an invitation into rest in God, never legalistic, never shaming.`;
+Give the ACTUAL words to pray or read inline — NOT an instruction to fetch them. Never write "open the Book of Common Prayer and read…", "go to…", or "read from…". Instead provide the real text: the actual Compline prayers and collect, the actual Psalm in the ESV, the Jesus Prayer words ("Lord Jesus Christ, Son of God, have mercy on me, a sinner"). For a weekly Sabbath, state the actual practice (e.g. "A 24-hour stop — no work, no screens. Rest, feast, worship, delight."). Use the ESV for any Scripture. Tone: warm, invitational, unhurried — an invitation into rest in God, never legalistic, never shaming.`;
 // "Spiritual (Other)" — broad, non-denominational spiritual rest.
 const OTHER_SPIRITUAL_GUIDANCE=`Include a spiritual dimension of rest that is BROAD and NON-DENOMINATIONAL — the user may hold any faith or none, so keep it open and adaptable. Draw on contemplative, meaning-centered practices: stillness and meditation, gratitude, awe and wonder (often in nature), reflection or journaling, breath and centering practices, and a sense of connection to something larger than oneself. Invite the user to adapt any practice to their own tradition or beliefs. Do NOT reference a specific religion's texts, figures, or doctrines. Tone: warm, open, invitational.`;
-let _restSetupOpen=false, _restGenLoading=false, _restGenErr='', _restCad='daily';
+let _restSetupOpen=false, _restGenLoading=false, _restGenErr='', _restCad='daily', _restSlot='';
+function _slotNow(){const hr=new Date().getHours();return hr>=5&&hr<12?'morning':hr>=12&&hr<18?'midday':'evening';}
 let _restSetup={work:'',depleted:[],schedule:'',spiritual:'none'};
 function _restProfileGet(){try{return JSON.parse(lsGet('_restProfile','null'));}catch(e){return null;}}
 function _restRhythmsGet(){try{return JSON.parse(lsGet('_restRhythms','null'));}catch(e){return null;}}
@@ -8872,24 +8873,35 @@ function _restRhythmsHTML(){
   h+=`</div>`;
   const cur=cad.find(c=>c[0]===_restCad);
   const items=Array.isArray(plan[_restCad])?plan[_restCad]:[];
-  h+=`<div style="font-size:11.5px;color:var(--sub);margin-bottom:10px">${cur?cur[2]:''}</div>`;
-  if(!items.length){
-    h+=`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${_restCad} practices in this plan. Tap Regenerate to refresh.</div>`;
+  // One bigger practice card
+  const card=it=>{
+    const c=REST_TYPE_COLORS[it.type]||'var(--blue)';
+    let body=it.practice!=null?it.practice:(it.what||'');
+    if(Array.isArray(body))body=body.join('\n');
+    const bodyHtml=_esc(String(body)).replace(/\n/g,'<br>');
+    return `<div style="border-left:3px solid ${c};background:var(--surface2);border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:17px;font-weight:800">${_esc(it.title||'')}</span>
+        <span style="font-size:10px;font-weight:700;color:${c};background:${c}1e;padding:2px 8px;border-radius:8px">${_restTypeName(it.type)}</span>
+      </div>
+      ${bodyHtml?`<div style="font-size:14.5px;line-height:1.7;white-space:pre-line">${bodyHtml}</div>`:''}
+    </div>`;
+  };
+  if(_restCad==='daily'){
+    // Time-based: show one card — morning (~5am), midday (~noon), evening (~6pm)
+    const order=['morning','midday','evening'];const lbl={morning:'Morning',midday:'Midday',evening:'Evening'};
+    const map={};
+    items.forEach((it,idx)=>{const s=order.includes(it.slot)?it.slot:order[idx%3];if(!map[s])map[s]=it;});
+    const curSlot=order.includes(_restSlot)?_restSlot:_slotNow();
+    h+=`<div style="display:flex;gap:5px;margin-bottom:12px">`;
+    order.forEach(k=>{const on=curSlot===k;h+=`<button onclick="restSetSlot('${k}')" style="flex:1;padding:6px 2px;border:1px solid ${on?'var(--blue)':'var(--border)'};border-radius:8px;background:${on?'rgba(122,154,171,.15)':'var(--surface2)'};color:${on?'var(--blue)':'var(--sub)'};font-size:11.5px;font-weight:700;cursor:pointer">${lbl[k]}</button>`;});
+    h+=`</div>`;
+    const it=map[curSlot];
+    h+= it?card(it):`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${lbl[curSlot].toLowerCase()} practice yet. Tap Regenerate to refresh.</div>`;
   } else {
-    items.forEach(it=>{
-      const c=REST_TYPE_COLORS[it.type]||'var(--blue)';
-      // "Just the practice": prefer the actual practice content; fall back to older fields.
-      let body=it.practice!=null?it.practice:(it.what||'');
-      if(Array.isArray(body))body=body.join('\n');
-      const bodyHtml=_esc(String(body)).replace(/\n/g,'<br>');
-      h+=`<div style="border-left:3px solid ${c};background:var(--surface2);border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
-          <span style="font-size:16px;font-weight:800">${_esc(it.title||'')}</span>
-          <span style="font-size:10px;font-weight:700;color:${c};background:${c}1e;padding:2px 8px;border-radius:8px">${_restTypeName(it.type)}</span>
-        </div>
-        ${bodyHtml?`<div style="font-size:14px;line-height:1.65;white-space:pre-line">${bodyHtml}</div>`:''}
-      </div>`;
-    });
+    h+=`<div style="font-size:11.5px;color:var(--sub);margin-bottom:10px">${cur?cur[2]:''}</div>`;
+    if(!items.length)h+=`<div style="font-size:13px;color:var(--sub);line-height:1.5;padding:6px 0">No ${_restCad} practices in this plan. Tap Regenerate to refresh.</div>`;
+    else items.forEach(it=>{h+=card(it);});
   }
   if(_restGenErr)h+=`<div style="font-size:12px;color:var(--red);margin-top:8px">${_esc(_restGenErr)}</div>`;
   h+=`</div>`;
@@ -8935,6 +8947,7 @@ function restSetWork(v){_restSetup.work=v;rRest();}
 function restSetSchedule(v){_restSetup.schedule=v;rRest();}
 function restSetSpiritual(v){_restSetup.spiritual=v;rRest();}
 function restSetCad(c){_restCad=c;rRest();}
+function restSetSlot(s){_restSlot=s;rRest();}
 function restToggleDeplete(k){const d=_restSetup.depleted;const i=d.indexOf(k);if(i>=0)d.splice(i,1);else{if(d.length>=3){showToast('Pick up to 3');return;}d.push(k);}rRest();}
 function restRegenerate(){const p=_restProfileGet();if(!p){openRestSetup();return;}_restSetup={work:p.work,depleted:p.depleted||[],schedule:p.schedule||'',spiritual:p.spiritual||(p.sabbath?'christian':'none')};restGenerate();}
 
@@ -8952,11 +8965,13 @@ ${p.spiritual==='christian'?CHRISTIAN_REST_GUIDANCE+'\nWeave these Christian pra
 
 Design personalized rest rhythms across four cadences, applying rest-by-contrast to their work type and prioritizing their depleted rest types. Daily items are short (a few minutes). Weekly is a real block. Monthly is a longer reset. Annual is deep renewal planned ahead.
 
-CRITICAL — give the PRACTICE ITSELF, not a description of it and not why it helps. The "practice" field is what the person actually does, ready to follow right now: the concrete step-by-step, or the actual words to pray/say. For prayers give the real words (use the ESV for any Scripture; for the Jesus Prayer use "Lord Jesus Christ, Son of God, have mercy on me, a sinner"). Keep each practice short enough to fit on a card — a few lines; use line breaks (\\n) between steps or lines. For longer liturgies (e.g. Compline) give the essential opening words plus one short line on how to continue. No preamble, no explanation of benefits.
+CRITICAL — give the PRACTICE ITSELF, not a description of it and not why it helps. The "practice" field is what the person actually does, ready to follow right now: the concrete action, or the actual words to pray/read. NEVER write filler like "open the Book of Common Prayer and read…", "go to…", "read from…", or "take out your…" — provide the ACTUAL text or action inline (the real Psalm verses in the ESV, the real prayer/collect, the Jesus Prayer words "Lord Jesus Christ, Son of God, have mercy on me, a sinner"). Keep each practice to a few lines; use line breaks (\\n) between lines. No preamble, no explanation of benefits.
+
+The DAILY cadence must have EXACTLY 3 practices — one per time slot — each tagged with "slot": "morning" (around 5am), "midday" (around noon), or "evening" (around 6pm). One morning, one midday, one evening.
 
 Respond ONLY with valid JSON, no markdown:
-{"daily":[{"type":"<one of: physical|mental|sensory|creative|emotional|social|spiritual>","title":"short name of the practice","practice":"the actual practice to do now, a few lines, \\n between lines"}],"weekly":[...],"monthly":[...],"annual":[...]}
-Use 2-3 daily, 2-3 weekly, 1-2 monthly, 1-2 annual items. Make every practice concrete and doable for THIS person.`;
+{"daily":[{"type":"<one of: physical|mental|sensory|creative|emotional|social|spiritual>","slot":"morning|midday|evening","title":"short name of the practice","practice":"the actual practice/words to do now, a few lines, \\n between lines"}],"weekly":[{"type":"...","title":"...","practice":"..."}],"monthly":[...],"annual":[...]}
+Exactly 3 daily (morning, midday, evening), 2-3 weekly, 1-2 monthly, 1-2 annual. Make every practice concrete and doable for THIS person.`;
   try{
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})});
