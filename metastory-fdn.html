@@ -476,23 +476,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* ── exercise how-to: animated blue silhouette ── */
 .ex-anim{display:flex;justify-content:center;align-items:center;background:rgba(122,154,171,.10);border:1px solid var(--border);border-radius:14px;padding:6px 0;margin-bottom:12px}
 .ex-anim svg{width:116px;height:116px}
-.ex-fig{stroke:var(--blue);stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.ex-fig{stroke:var(--blue);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;fill:none}
 .ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
-.ex-anim .an{will-change:transform}
-@keyframes exArmUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-@keyframes exBob{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
-@keyframes exBobUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-@keyframes exHover{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes exFore{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.ex-anim[data-p="press"] .an{animation:exArmUp 1.5s ease-in-out infinite}
-.ex-anim[data-p="raise"] .an{animation:exArmUp 1.8s ease-in-out infinite}
-.ex-anim[data-p="curl"] .an{animation:exFore 1.4s ease-in-out infinite}
-.ex-anim[data-p="squat"] .an{animation:exBob 1.8s ease-in-out infinite}
-.ex-anim[data-p="hinge"] .an{animation:exBob 2s ease-in-out infinite}
-.ex-anim[data-p="pull"] .an{animation:exBobUp 1.6s ease-in-out infinite}
-.ex-anim[data-p="core"] .an{animation:exHover 2.2s ease-in-out infinite}
-.ex-anim[data-p="stand"] .an{animation:exHover 2.6s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.ex-anim .an{animation:none}}
+.ex-fig .grnd{stroke:var(--border);stroke-width:3}
+/* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -8951,17 +8938,67 @@ function _exPattern(name){
   if(/\bfly|flye\b/.test(n))return 'raise';
   return 'stand';
 }
+// Each pattern is a tiny skeleton "rig". A coordinate is either a number (static)
+// or [start, active] — the joint travels start→active→start through the rep, so
+// the figure actually performs the movement (knees bend, elbows drive, hips hinge)
+// rather than the whole limb drifting up and down. Motion is generated as SMIL
+// <animate> per joint (works on iOS Safari + Chrome), only one renders at a time.
+const EX_RIG={
+  press:{dur:'2s',head:{r:9,x:60,y:26},
+    bones:[[60,40,60,78],[54,46,66,46],[60,78,50,104],[60,78,70,104],
+      [54,46,[44,50],[58,30]],[[44,50],[58,30],[50,50],[49,14]],
+      [66,46,[76,70],[58,30]],[[76,70],[58,30],[70,70],[49,14]]],
+    bells:[{r:5,x:50,y:[49,14]},{r:5,x:70,y:[49,14]}]},
+  curl:{dur:'1.8s',head:{r:9,x:60,y:24},
+    bones:[[60,33,60,74],[54,46,66,46],[60,74,50,104],[60,74,70,104],
+      [54,46,50,70],[66,46,70,70],
+      [50,70,[48,54],[92,54]],[70,70,[72,66],[92,54]]],
+    bells:[{r:5,x:[48,54],y:[92,54]},{r:5,x:[72,66],y:[92,54]}]},
+  raise:{dur:'2s',head:{r:9,x:60,y:26},
+    bones:[[60,35,60,74],[54,46,66,46],[60,74,50,104],[60,74,70,104],
+      [54,46,[46,28],[76,46]],[66,46,[74,92],[76,46]]],
+    bells:[{r:5,x:[46,28],y:[76,46]},{r:5,x:[74,92],y:[76,46]}]},
+  pull:{dur:'2.2s',head:{r:8,x:60,y:[44,33]},
+    bones:[[34,16,86,16],
+      [48,18,[50,40],[40,42]],[[50,40],[40,42],[56,52],[56,40]],
+      [72,18,[70,80],[40,42]],[[70,80],[40,42],[64,68],[56,40]],
+      [60,[52,40],60,[84,72]],
+      [60,[84,72],53,[108,98]],[60,[84,72],67,[108,98]]],
+    bells:[]},
+  squat:{dur:'2.4s',head:{r:9,x:[60,53],y:[20,38]},
+    bones:[[[60,56],[32,48],[60,64],[64,74]],[[60,64],[64,74],[60,78],[86,86]],
+      [[60,78],[86,86],58,104],[58,104,74,104],
+      [[60,56],[32,48],[66,84],52]],
+    bells:[]},
+  hinge:{dur:'2.4s',head:{r:9,x:[60,88],y:[22,48]},
+    bones:[[[60,80],[34,52],[60,54],66],[[60,54],66,[59,58],86],
+      [[59,58],86,58,104],[58,104,74,104],
+      [[60,80],[34,52],[60,80],[60,82]]],
+    bells:[{r:5,x:[60,80],y:[60,82]}]},
+  core:{dur:'2.4s',head:{r:7,x:32,y:98},
+    bones:[[22,106,114,106,'grnd'],[38,98,76,98],
+      [76,98,[96,78],[86,76]],[[96,78],[86,76],[110,80],[90,52]]],
+    bells:[]},
+  stand:{dur:'2s',head:{r:9,x:60,y:24},
+    bones:[[60,33,60,72],[54,46,66,46],[54,46,48,66],[66,46,72,66],
+      [60,72,70,104],[60,72,[52,55],[88,82]],[[52,55],[88,82],[50,57],[104,94]]],
+    bells:[]}
+};
+const _EX_KS='0.45 0 0.55 1;0.45 0 0.55 1';
+function _exReduce(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches);}catch(e){return false;}}
 function _exPose(p){
-  switch(p){
-    case 'press': return '<circle class="hd" cx="60" cy="30" r="9"/><line x1="60" y1="39" x2="60" y2="74"/><line x1="60" y1="74" x2="48" y2="104"/><line x1="60" y1="74" x2="72" y2="104"/><g class="an"><line x1="60" y1="46" x2="46" y2="22"/><line x1="60" y1="46" x2="74" y2="22"/><circle class="bell" cx="44" cy="19" r="5.5"/><circle class="bell" cx="76" cy="19" r="5.5"/></g>';
-    case 'raise': return '<circle class="hd" cx="60" cy="26" r="9"/><line x1="60" y1="35" x2="60" y2="72"/><line x1="60" y1="72" x2="48" y2="104"/><line x1="60" y1="72" x2="72" y2="104"/><g class="an"><line x1="60" y1="44" x2="34" y2="42"/><line x1="60" y1="44" x2="86" y2="42"/><circle class="bell" cx="31" cy="42" r="5.5"/><circle class="bell" cx="89" cy="42" r="5.5"/></g>';
-    case 'curl': return '<circle class="hd" cx="60" cy="24" r="9"/><line x1="60" y1="33" x2="60" y2="72"/><line x1="60" y1="72" x2="48" y2="104"/><line x1="60" y1="72" x2="72" y2="104"/><line x1="60" y1="44" x2="50" y2="66"/><line x1="60" y1="44" x2="70" y2="66"/><g class="an"><line x1="50" y1="66" x2="56" y2="48"/><line x1="70" y1="66" x2="64" y2="48"/><circle class="bell" cx="57" cy="46" r="4.5"/><circle class="bell" cx="63" cy="46" r="4.5"/></g>';
-    case 'squat': return '<g class="an"><circle class="hd" cx="60" cy="32" r="9"/><line x1="60" y1="41" x2="60" y2="66"/><line x1="60" y1="48" x2="82" y2="52"/><line x1="60" y1="66" x2="44" y2="74"/><line x1="60" y1="66" x2="76" y2="74"/><line x1="44" y1="74" x2="44" y2="104"/><line x1="76" y1="74" x2="76" y2="104"/></g>';
-    case 'hinge': return '<line x1="64" y1="68" x2="60" y2="104"/><line x1="64" y1="68" x2="74" y2="104"/><g class="an"><circle class="hd" cx="40" cy="46" r="9"/><line x1="47" y1="50" x2="64" y2="68"/><line x1="52" y1="54" x2="49" y2="80"/><circle class="bell" cx="48" cy="84" r="5"/></g>';
-    case 'pull': return '<line x1="36" y1="18" x2="84" y2="18"/><g class="an"><line x1="60" y1="40" x2="49" y2="20"/><line x1="60" y1="40" x2="71" y2="20"/><circle class="hd" cx="60" cy="49" r="9"/><line x1="60" y1="58" x2="60" y2="84"/><line x1="60" y1="84" x2="52" y2="102"/><line x1="60" y1="84" x2="68" y2="102"/></g>';
-    case 'core': return '<g class="an"><circle class="hd" cx="92" cy="56" r="8"/><line x1="86" y1="60" x2="34" y2="74"/><line x1="40" y1="70" x2="40" y2="94"/><line x1="34" y1="94" x2="48" y2="94"/><line x1="36" y1="76" x2="18" y2="94"/></g>';
-    default: return '<g class="an"><circle class="hd" cx="60" cy="24" r="9"/><line x1="60" y1="33" x2="60" y2="70"/><line x1="60" y1="44" x2="44" y2="64"/><line x1="60" y1="44" x2="76" y2="64"/></g><line x1="60" y1="70" x2="48" y2="104"/><line x1="60" y1="70" x2="72" y2="104"/>';
-  }
+  const rig=EX_RIG[p]||EX_RIG.stand;
+  const red=_exReduce(), dur=rig.dur||'2s';
+  const P=v=>Array.isArray(v)?v:[v,v];
+  const an=(attr,pr)=>(pr[0]===pr[1]||red)?'':`<animate attributeName="${attr}" values="${pr[0]};${pr[1]};${pr[0]}" keyTimes="0;0.5;1" dur="${dur}" calcMode="spline" keySplines="${_EX_KS}" repeatCount="indefinite"/>`;
+  let out='';
+  (rig.bones||[]).forEach(b=>{
+    const x1=P(b[0]),y1=P(b[1]),x2=P(b[2]),y2=P(b[3]),cls=b[4]?` class="${b[4]}"`:'';
+    out+=`<line${cls} x1="${x1[0]}" y1="${y1[0]}" x2="${x2[0]}" y2="${y2[0]}">${an('x1',x1)}${an('y1',y1)}${an('x2',x2)}${an('y2',y2)}</line>`;
+  });
+  if(rig.head){const h=rig.head,x=P(h.x),y=P(h.y);out+=`<circle class="hd" cx="${x[0]}" cy="${y[0]}" r="${h.r||9}">${an('cx',x)}${an('cy',y)}</circle>`;}
+  (rig.bells||[]).forEach(bl=>{const x=P(bl.x),y=P(bl.y);out+=`<circle class="bell" cx="${x[0]}" cy="${y[0]}" r="${bl.r||5}">${an('cx',x)}${an('cy',y)}</circle>`;});
+  return out;
 }
 function _exAnim(name){
   const p=_exPattern(name);
