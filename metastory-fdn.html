@@ -2675,7 +2675,7 @@ function rToday(){
       <span><b>A meal check-in is waiting</b> — a few seconds on how ${pend} sat with you. That signal is how you learn your right plate.</span></div>`;
   }
   // This week's focus
-  let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress());if(fx&&fx.label)focus=fx.label;}}catch(e){}
+  let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress(PROG_REVIEW_DAYS));if(fx&&fx.label)focus=fx.label;}}catch(e){}
   if(focus){
     h+=`<div class="card" style="background:rgba(183,186,167,.18);border-color:var(--purple)"><span class="kicker" style="color:#6d7868">This week's focus</span><div style="font-size:14px;font-weight:700;margin-top:4px">${focus}</div></div>`;
   }
@@ -3360,6 +3360,7 @@ function rProgressPage(){
 // reduced weight in the overall while they ramp up. Workout completion is
 // lenient (matches the rest of the app): "Mark Complete" flag OR logged sets.
 const PROG_DAYS=30;
+const PROG_REVIEW_DAYS=7; // Progress card + Weekly Review use a recent 7-day window (DRESS Summary stays long-term at PROG_DAYS)
 const CK_POS_MOODS=['Calm','Content','Energized'];
 const CK_GOOD_CTX=['relaxing','with_people','eating_slowly'];
 function _dkOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -3439,10 +3440,11 @@ const _PROG_WEIGHTS={
   maintenance:{workout:.20,food:.20,water:.12,mood:.12,ctx:.12,supps:.12,assess:.12}
 };
 const GOAL_LABELS={muscle:'Build Muscle & Strength',fat_loss:'Lose Fat & Get Lean',fitness:'Fitness & Endurance',maintenance:'Maintain & Feel Great'};
-function computeProgress(){
+function computeProgress(days){
+  const N=days||PROG_DAYS;
   const now=new Date();
   const all=[];
-  for(let i=0;i<PROG_DAYS;i++){
+  for(let i=0;i<N;i++){
     const d=new Date(now);d.setDate(d.getDate()-i);
     all.push(_dayFacts(d));
   }
@@ -3454,7 +3456,7 @@ function computeProgress(){
     mood:_sinceFirst(all,f=>f.ckAny>0),
     ctx:_sinceFirst(all,f=>f.ckAny>0),
     supps:_sinceFirst(all,f=>f.suppDay>0),
-    assess:PROG_DAYS
+    assess:N
   };
   const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
   const gutR=_parseAssessResult(lsGet('_assess_gut_result',null));
@@ -3548,14 +3550,14 @@ function pickWeeklyFocus(pr){
   return {focus:mk(ranked[0]),quick:ranked.length>1&&ranked[1].score<85?mk(ranked[1]):null};
 }
 function rProgressCard(){
-  const pr=computeProgress();
+  const pr=computeProgress(PROG_REVIEW_DAYS);
   const focus=pickWeeklyFocus(pr);
   const col=v=>v>=70?'var(--green)':v>=40?'var(--orange)':'var(--red)';
   const trCol=a=>a==='↑'?'var(--green)':a==='↓'?'var(--orange)':'var(--sub)';
   return `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div class="ct" style="padding:0;margin:0">Your Progress</div>
-      <div style="font-size:11px;color:var(--sub)">Last 30 days</div>
+      <div style="font-size:11px;color:var(--sub)">Last 7 days</div>
     </div>
     <div style="display:flex;align-items:baseline;gap:12px;margin:10px 0 14px">
       <div style="font-size:44px;font-weight:800;line-height:1;color:${col(pr.overall)}">${pr.overall}<span style="font-size:17px;font-weight:700;color:var(--sub)">/100</span></div>
@@ -3596,7 +3598,7 @@ function maybeAutoWeekly(){
   const r=getAIWeekly();
   if(r&&Date.now()-r.ts<7*86400000)return;
   if(lsGet('_aiWeeklyTryDay','')===dk())return; // one auto attempt per day (protects free API quota)
-  const pr=computeProgress();
+  const pr=computeProgress(PROG_REVIEW_DAYS);
   if(!pr.stats.daysLogged&&!pr.stats.doneWO)return;
   _aiWeeklyAutoTried=true;
   lsSet('_aiWeeklyTryDay',dk());
@@ -3605,9 +3607,9 @@ function maybeAutoWeekly(){
 async function runWeeklyReview(){
   if(_aiWeeklyLoading)return;
   _aiWeeklyLoading=true;_aiWeeklyErrMsg='';
-  if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
+  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();
   try{
-    const pr=computeProgress();
+    const pr=computeProgress(PROG_REVIEW_DAYS);
     let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
     const st=pr.stats;
     const fx=pickWeeklyFocus(pr);
@@ -3616,7 +3618,7 @@ async function runWeeklyReview(){
 THIS WEEK'S FOCUS: ${fx.focus.label} — ${fx.focus.line}
 ${fx.quick?'QUICK WIN: '+fx.quick.label+' — '+fx.quick.line:''}
 
-30-DAY DATA (score 0-100, trend = last half vs prior half of each category's history):
+7-DAY DATA (score 0-100, trend = last half vs prior half of each category's history):
 - Overall: ${pr.overall}/100 (${pr.label}, ${pr.trendLabel})
 ${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, trend '+(c.trend>0?'+':'')+c.trend)+' ('+c.detail+')').join('\n')}
 - Nervous system assessment: ${st.ns?JSON.stringify(st.ns):'not taken'}
@@ -3650,7 +3652,7 @@ Respond ONLY with valid JSON, no markdown:
     }
   }catch(e){console.error('weekly review error',e);_aiWeeklyErrMsg='Couldn\'t reach the AI service — check your connection and try again.';}
   _aiWeeklyLoading=false;
-  if(_assessPage==='hub'&&curPage==='assess')document.getElementById('page-assess').innerHTML=rAssess();
+  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();
 }
 function rAIWeeklyCard(){
   const r=getAIWeekly();
@@ -3660,10 +3662,10 @@ function rAIWeeklyCard(){
       <div class="ct" style="padding:0;margin:0">Weekly Review</div>
       ${r?`<div style="font-size:11px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
     </div>
-    ${_aiWeeklyLoading?`<div style="font-size:15px;color:var(--sub);padding:6px 0">Reviewing your last 30 days…</div>`:
+    ${_aiWeeklyLoading?`<div style="font-size:15px;color:var(--sub);padding:6px 0">Reviewing your last 7 days…</div>`:
       r?`<div style="font-size:15px;line-height:1.65;margin-bottom:10px">${para}</div>
       ${r.adjustPlan?`<button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
-      `<div style="font-size:15px;color:var(--sub);line-height:1.55;margin-bottom:10px">A short note on your progress, refreshed each week from your last 30 days.</div>`}
+      `<div style="font-size:15px;color:var(--sub);line-height:1.55;margin-bottom:10px">A short note on your progress, refreshed each week from your last 7 days.</div>`}
     ${_aiWeeklyErrMsg?`<div style="font-size:12px;color:var(--red);line-height:1.5;margin-bottom:8px">${_aiWeeklyErrMsg}</div>`:''}
     ${_aiWeeklyLoading?'':`<button onclick="runWeeklyReview()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 0">${r?'Refresh review':'Run first review'}</button>`}
   </div>`;
