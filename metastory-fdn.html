@@ -8829,8 +8829,10 @@ const CHRISTIAN_REST_GUIDANCE=`Make every spiritual rest practice EXPLICITLY CHR
 2. The Desert Fathers & Mothers (the early Christian Abbas and Ammas) — solitude, interior silence and stillness (hesychia), withdrawal, watchfulness, manual work woven with unceasing prayer, and the Jesus Prayer ("Lord Jesus Christ, Son of God, have mercy on me, a sinner").
 3. The Book of Common Prayer — fixed-hour prayer / the Daily Office: Morning Prayer, Midday Prayer, Evening Prayer, and Compline (night prayer); the collects; praying the Psalms.
 Name practices CONCRETELY and by source — e.g. "Pray Compline from the Book of Common Prayer before bed," "Keep a weekly Sabbath as in Practicing the Way — a 24-hour stop to rest and delight in God," "15 minutes of silent solitude with the Jesus Prayer, in the way of the desert mothers and fathers." Use the ESV for any Scripture. Tone: warm, invitational, unhurried — an invitation into rest in God, never legalistic, never shaming.`;
+// "Spiritual (Other)" — broad, non-denominational spiritual rest.
+const OTHER_SPIRITUAL_GUIDANCE=`Include a spiritual dimension of rest that is BROAD and NON-DENOMINATIONAL — the user may hold any faith or none, so keep it open and adaptable. Draw on contemplative, meaning-centered practices: stillness and meditation, gratitude, awe and wonder (often in nature), reflection or journaling, breath and centering practices, and a sense of connection to something larger than oneself. Invite the user to adapt any practice to their own tradition or beliefs. Do NOT reference a specific religion's texts, figures, or doctrines. Tone: warm, open, invitational.`;
 let _restSetupOpen=false, _restGenLoading=false, _restGenErr='';
-let _restSetup={work:'',depleted:[],schedule:'',sabbath:false};
+let _restSetup={work:'',depleted:[],schedule:'',spiritual:'none'};
 function _restProfileGet(){try{return JSON.parse(lsGet('_restProfile','null'));}catch(e){return null;}}
 function _restRhythmsGet(){try{return JSON.parse(lsGet('_restRhythms','null'));}catch(e){return null;}}
 function _restTypeName(k){const t=REST_TYPES.find(x=>x.k===k);return t?t.n:(k||'Rest');}
@@ -8859,7 +8861,7 @@ function _restRhythmsHTML(){
       <span class="kicker">Your Rest Rhythms</span>
       <div style="display:flex;gap:12px"><button class="mk-link" onclick="restRegenerate()">Regenerate</button><button class="mk-link" onclick="openRestSetup()">Redo</button></div>
     </div>
-    <p style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-bottom:6px">Built for ${plan.work==='hands'?'hands-on work — so your rest leans mental and quiet':plan.work==='mind'?'mind-heavy work — so your rest leans physical and hands-on':'a mix of mind and hands'}.${plan.sabbath?' Includes Christian rest practices — Sabbath, silence, and fixed-hour prayer.':''}</p>`;
+    <p style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-bottom:6px">Built for ${plan.work==='hands'?'hands-on work — so your rest leans mental and quiet':plan.work==='mind'?'mind-heavy work — so your rest leans physical and hands-on':'a mix of mind and hands'}.${(plan.spiritual||(plan.sabbath?'christian':'none'))==='christian'?' Includes Christian rest practices — Sabbath, silence, and fixed-hour prayer.':(plan.spiritual==='other'?' Includes a broad spiritual rhythm of stillness and reflection.':'')}</p>`;
   cad.forEach(([key,label,sub])=>{
     const items=Array.isArray(plan[key])?plan[key]:[];
     if(!items.length)return;
@@ -8887,6 +8889,7 @@ function _restSetupHTML(){
   const p=_restSetup;
   const workOpt=(v,l,sub)=>`<button onclick="restSetWork('${v}')" style="flex:1;min-width:90px;text-align:left;padding:10px 12px;border-radius:10px;border:1.5px solid ${p.work===v?'var(--blue)':'var(--border)'};background:${p.work===v?'rgba(122,154,171,.15)':'var(--surface2)'};cursor:pointer"><div style="font-size:13px;font-weight:700">${l}</div><div style="font-size:11px;color:var(--sub);margin-top:2px">${sub}</div></button>`;
   const schedOpt=(v,l)=>`<button onclick="restSetSchedule('${v}')" style="flex:1;padding:8px;border-radius:9px;border:1.5px solid ${p.schedule===v?'var(--blue)':'var(--border)'};background:${p.schedule===v?'rgba(122,154,171,.15)':'var(--surface2)'};font-size:12px;font-weight:600;color:${p.schedule===v?'var(--blue)':'var(--sub)'};cursor:pointer">${l}</button>`;
+  const spOpt=(v,l)=>`<button onclick="restSetSpiritual('${v}')" style="flex:1;padding:8px;border-radius:9px;border:1.5px solid ${p.spiritual===v?'var(--blue)':'var(--border)'};background:${p.spiritual===v?'rgba(122,154,171,.15)':'var(--surface2)'};font-size:12px;font-weight:600;color:${p.spiritual===v?'var(--blue)':'var(--sub)'};cursor:pointer">${l}</button>`;
   let h=`<div class="card" style="margin-bottom:12px">
     <span class="kicker">Set up your rest rhythms</span>
     <div style="font-size:13px;font-weight:700;margin:12px 0 7px">Do you mostly work with your mind or your hands?</div>
@@ -8904,10 +8907,9 @@ function _restSetupHTML(){
   h+=`</div>
     <div style="font-size:13px;font-weight:700;margin:16px 0 7px">How much control do you have over your schedule?</div>
     <div style="display:flex;gap:8px">${schedOpt('low','Very little')}${schedOpt('some','Some')}${schedOpt('lots','A lot')}</div>
-    <div onclick="restToggleSabbath()" style="display:flex;align-items:flex-start;gap:10px;margin-top:16px;cursor:pointer">
-      <div class="chk-box ${p.sabbath?'on':''}" style="margin-top:1px">${p.sabbath?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-      <div><div style="font-size:13px;font-weight:700">Include Christian rest practices</div><div style="font-size:11.5px;color:var(--sub);line-height:1.4">Sabbath, silence &amp; solitude, and fixed-hour prayer — drawing on Practicing the Way, the desert fathers &amp; mothers, and the Book of Common Prayer (ESV).</div></div>
-    </div>
+    <div style="font-size:13px;font-weight:700;margin:16px 0 7px">Spiritual rest</div>
+    <div style="display:flex;gap:8px">${spOpt('none','None')}${spOpt('christian','Christian')}${spOpt('other','Other')}</div>
+    <div style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-top:7px">${p.spiritual==='christian'?'Sabbath, silence &amp; solitude, and fixed-hour prayer — drawing on Practicing the Way, the desert fathers &amp; mothers, and the Book of Common Prayer (ESV).':p.spiritual==='other'?'Broad, non-denominational rest you can adapt to your own faith or beliefs — stillness, gratitude, awe, reflection, and connection to something larger.':'Secular rest only — no spiritual content.'}</div>
     ${_restGenErr?`<div style="font-size:12px;color:var(--red);margin-top:10px">${_esc(_restGenErr)}</div>`:''}
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-s" style="flex:1" onclick="closeRestSetup()">Cancel</button>
@@ -8916,13 +8918,13 @@ function _restSetupHTML(){
   return h;
 }
 
-function openRestSetup(){const ex=_restProfileGet();_restSetup=ex?{work:ex.work||'',depleted:ex.depleted||[],schedule:ex.schedule||'',sabbath:!!ex.sabbath}:{work:'',depleted:[],schedule:'',sabbath:false};_restGenErr='';_restSetupOpen=true;rRest();}
+function openRestSetup(){const ex=_restProfileGet();const sp=ex?(ex.spiritual||(ex.sabbath?'christian':'none')):'none';_restSetup=ex?{work:ex.work||'',depleted:ex.depleted||[],schedule:ex.schedule||'',spiritual:sp}:{work:'',depleted:[],schedule:'',spiritual:'none'};_restGenErr='';_restSetupOpen=true;rRest();}
 function closeRestSetup(){_restSetupOpen=false;_restGenErr='';rRest();}
 function restSetWork(v){_restSetup.work=v;rRest();}
 function restSetSchedule(v){_restSetup.schedule=v;rRest();}
-function restToggleSabbath(){_restSetup.sabbath=!_restSetup.sabbath;rRest();}
+function restSetSpiritual(v){_restSetup.spiritual=v;rRest();}
 function restToggleDeplete(k){const d=_restSetup.depleted;const i=d.indexOf(k);if(i>=0)d.splice(i,1);else{if(d.length>=3){showToast('Pick up to 3');return;}d.push(k);}rRest();}
-function restRegenerate(){const p=_restProfileGet();if(!p){openRestSetup();return;}_restSetup={work:p.work,depleted:p.depleted||[],schedule:p.schedule||'',sabbath:!!p.sabbath};restGenerate();}
+function restRegenerate(){const p=_restProfileGet();if(!p){openRestSetup();return;}_restSetup={work:p.work,depleted:p.depleted||[],schedule:p.schedule||'',spiritual:p.spiritual||(p.sabbath?'christian':'none')};restGenerate();}
 
 async function restGenerate(){
   if(_restGenLoading)return;
@@ -8934,7 +8936,7 @@ async function restGenerate(){
   const prompt=`You are a trauma-informed wellness coach helping someone design rhythms of rest, grounded in Dr. Saundra Dalton-Smith's seven types of rest (physical, mental, sensory, creative, emotional, social, spiritual) and the principle of REST BY CONTRAST: people who work with their MIND rest best by doing something physical/with their hands, and people who work with their HANDS/body rest best with something mental, quiet, or still.
 
 This person works primarily with ${workTxt}. They feel most depleted in these rest types: ${p.depleted.length?p.depleted.join(', '):'unsure — infer from their work type'}. Their control over their schedule is: ${p.schedule||'some'}.
-${p.sabbath?CHRISTIAN_REST_GUIDANCE+'\nWeave these Christian practices across all four cadences (e.g. daily fixed-hour prayer or the Jesus Prayer; a weekly Sabbath; monthly solitude/silence; an annual silent retreat).':'Keep it fully secular — no religious content.'}
+${p.spiritual==='christian'?CHRISTIAN_REST_GUIDANCE+'\nWeave these Christian practices across all four cadences (e.g. daily fixed-hour prayer or the Jesus Prayer; a weekly Sabbath; monthly solitude/silence; an annual silent retreat).':p.spiritual==='other'?OTHER_SPIRITUAL_GUIDANCE:'Keep it fully secular — no religious content.'}
 
 ${WHOLE_BODY_LENS}
 
@@ -8953,7 +8955,7 @@ Use 2-3 daily, 2-3 weekly, 1-2 monthly, 1-2 annual items. Make every item concre
     const jm=raw.match(/\{[\s\S]*\}/);
     const out=jm?JSON.parse(jm[0]):null;
     if(out&&(out.daily||out.weekly)){
-      out.work=p.work; out.sabbath=p.sabbath; out.generatedAt=Date.now();
+      out.work=p.work; out.spiritual=p.spiritual; out.sabbath=(p.spiritual==='christian'); out.generatedAt=Date.now();
       lsSet('_restRhythms',JSON.stringify(out));
       try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
       showToast('Your rest rhythms are ready');
