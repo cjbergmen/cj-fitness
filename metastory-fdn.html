@@ -444,14 +444,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-todaybtn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer}
 
 /* ── mockup Diet ── */
-.mk-cals{display:flex;align-items:center;gap:18px}
-.mk-ring{width:104px;height:104px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center}
-.mk-ring-in{width:80px;height:80px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.mk-ring-in b{font-size:21px;font-family:var(--font-serif);font-weight:500;line-height:1}
-.mk-ring-in small{font-size:9px;color:var(--sub);letter-spacing:.07em;margin-top:2px}
-.mk-macro{margin-bottom:9px}
+.mk-cals{display:flex;align-items:center;gap:22px}
+.mk-ring{width:124px;height:124px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center}
+.mk-ring-in{width:96px;height:96px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mk-ring-in b{font-size:26px;font-family:var(--font-serif);font-weight:500;line-height:1}
+.mk-ring-in small{font-size:9.5px;color:var(--sub);letter-spacing:.07em;margin-top:3px}
+.mk-macro{margin-bottom:11px}
 .mk-macro:last-child{margin-bottom:0}
-.mk-macro .r{display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;margin-bottom:4px}
+.mk-macro .r{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:5px}
 .mk-macro .r span:last-child{color:var(--sub);font-weight:500}
 .mk-mbar{height:7px;border-radius:999px;background:var(--surface3);overflow:hidden}
 .mk-mbar i{display:block;height:100%;border-radius:999px}
@@ -2670,7 +2670,7 @@ function rToday(){
   const greet=hr<12?'Good morning':(hr<18?'Good afternoon':'Good evening');
   let prof={};try{prof=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
   const name=prof.name?(', '+String(prof.name).split(' ')[0]):'';
-  const R=_routineNow();
+  const R=(typeof _routineNow==='function')?_routineNow():{active:[],next:null};
   const lead=R.active.length
     ? 'Here’s what your day is asking for right now.'
     : (R.next ? ('Next up: '+R.next.a+' · '+_winLabel(R.next)) : 'Nothing scheduled right now — a good moment to just check in with yourself.');
@@ -9232,7 +9232,7 @@ function rDiet(){
   const log=getLog(),m=getMacros(),t=getTgt();
   const calLeft=Math.max(0,Math.round((t.k||0)-(m.k||0)));
   const calPct=t.k?Math.min(100,Math.round((m.k||0)/t.k*100)):0;
-  let h=_tabRoutineHTML('food')+`<div class="card">
+  let h=`<div class="card" style="padding-top:18px;padding-bottom:18px">
     <div class="mk-cals">
       <div class="mk-ring" style="background:conic-gradient(var(--green) 0 ${calPct}%, var(--surface3) ${calPct}% 100%)">
         <div class="mk-ring-in"><b>${calLeft}</b><small>CAL LEFT</small></div>
@@ -9244,15 +9244,14 @@ function rDiet(){
       </div>
     </div>
   </div>`;
-  // post-meal check-in chip
-  const pending=log.some(e=>{const ma=e.moodAfter;const has=Array.isArray(ma)?ma.length:!!ma;return !has;});
-  h+=`<div class="fdn-chip">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-    <span>${pending?'<b>A meal check-in is waiting</b> — a quick read on energy and fullness about 90 minutes after eating. Steady afternoons start here.':'After each meal, notice how you feel 90 minutes on — that signal is how you learn your right plate.'}</span></div>`;
+  // primary actions — prominent Log Food + Library (ported from the original app)
+  h+=`<div style="display:flex;gap:9px;margin-bottom:12px">
+      <button class="btn btn-g btn-f" style="flex:2;font-size:15.5px;padding:15px" onclick="openFood()">+ Log Food</button>
+      <button class="btn btn-s btn-f" style="flex:1;white-space:nowrap" onclick="openFood();setFoodModalTab('library')">Library</button>
+    </div>`;
   // meals
   h+=`<div class="card"><div style="display:flex;align-items:center;justify-content:space-between">
-      <span class="kicker" style="color:var(--sub)">Today's meals</span>
-      <button class="mk-link" onclick="openFood()">+ Log food</button></div>`;
+      <span class="kicker" style="color:var(--sub)">Today's meals</span></div>`;
   if(!log.length){
     h+=`<div style="font-size:13px;color:var(--sub);padding:12px 0 4px;line-height:1.55">Nothing logged yet. Tap "+ Log food" to start — describe it in words with Analyze Meal, or pick from your library.</div>`;
   }else{
@@ -9295,7 +9294,6 @@ function rDiet(){
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
       <div style="flex:1"><h4>Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></h4><small>${last?'Last: '+last.v+' mg/dL':'Target 80–90 before meals'}</small></div>
       <span class="mk-link">Add</span></div>`;
-  h+=`<button class="btn btn-s btn-f" style="margin-top:2px;color:var(--text)" onclick="openFood();setFoodModalTab('library')">Browse food library</button>`;
   document.getElementById('page-food').innerHTML=h;
 }
 
@@ -9941,6 +9939,9 @@ function _initPreviewSandbox(){
   _mfdnBanner();
 }
 try{_initPreviewSandbox();}catch(e){}
+// The init block in the 1st <script> runs rToday() before this 2nd block defines
+// _routineNow; now that everything is loaded, re-render Today so it shows fully.
+try{if(typeof curPage!=='undefined'&&curPage==='today'&&typeof rToday==='function')rToday();}catch(e){}
 </script>
 </body>
 </html>
