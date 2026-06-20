@@ -9173,7 +9173,7 @@ function _prayPage(kind,opts){
     return wrap(H(opts.title||'Scripture')+body(opts.text||'')+attrib(opts.attrib));
   }
   if(kind==='complete'){
-    return wrap(H(opts.title||'Amen')+body(opts.text||'')+`<div style="margin-top:28px"><button onclick="completePrayer('${opts.slot}')" style="width:100%;background:rgba(255,255,255,.94);color:#222;font-family:var(--font-sans);font-size:15px;font-weight:700;letter-spacing:.02em;padding:14px;border:none;border-radius:12px;cursor:pointer">Complete</button></div>`);
+    return wrap(H(opts.title||'Amen')+body(opts.text||'')+attrib(opts.attrib));
   }
   return wrap(H(opts.title)+body(opts.text||'')+attrib(opts.attrib));
 }
@@ -9184,77 +9184,87 @@ function _buildPrayerPages(mode,slot){
   const opening=_restPick(REST_OPENINGS,off);
   const verse=_restPick(REST_VERSES,off);
   const reading=_restPick(REST_REFLECTIONS,off);
-  P.push(_prayPage('title',{title,date}));
+  const add=(k,o,ring)=>P.push({h:_prayPage(k,o||{}),ring:!!ring});
+  add('title',{title,date});
   if(mode==='christian'){
     if(slot==='morning'){
-      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
-      P.push(_prayPage('pause',{title:'Be still',text:'Take the next two minutes and quiet your heart before the Lord. Ask him what he is saying to you today.'}));
-      P.push(_prayPage('std',{title:'Confession',text:_PRAY_TEXT.confession}));
-      P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
-      P.push(_prayPage('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot}));
+      add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
+      add('pause',{title:'Be still',text:'Take the next two minutes and quiet your heart before the Lord. Ask him what he is saying to you today.'},true);
+      add('std',{title:'Confession',text:_PRAY_TEXT.confession});
+      add('lords');
+      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
     } else if(slot==='midday'){
-      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
-      P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
-      P.push(_prayPage('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot}));
+      add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
+      add('lords');
+      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
     } else {
-      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
-      P.push(_prayPage('std',{title:'Confession',text:_PRAY_TEXT.confession}));
-      P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
-      P.push(_prayPage('complete',{title:'Peace at the last',text:_PRAY_TEXT.blessing,slot}));
+      add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
+      add('std',{title:'Confession',text:_PRAY_TEXT.confession});
+      add('lords');
+      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('complete',{title:'Peace at the last',text:_PRAY_TEXT.blessing,slot});
     }
   } else {
     if(slot==='morning'){
-      P.push(_prayPage('std',{title:'Arrive',text:_PRAY_TEXT.r_open_morning}));
-      P.push(_prayPage('pause',{title:'Be still',text:'Take two minutes. Let your attention rest on your breath. There is nowhere else to be.'}));
-      P.push(_prayPage('std',{title:'Intention',text:_PRAY_TEXT.r_intention}));
-      P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
-      P.push(_prayPage('complete',{title:'Go gently',text:_PRAY_TEXT.r_closing,slot}));
+      add('std',{title:'Arrive',text:_PRAY_TEXT.r_open_morning});
+      add('pause',{title:'Be still',text:'Take two minutes. Let your attention rest on your breath. There is nowhere else to be.'},true);
+      add('std',{title:'Intention',text:_PRAY_TEXT.r_intention});
+      add('std',{title:'Centering',text:_PRAY_TEXT.r_centering});
+      add('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)});
+      add('complete',{title:'Go gently',text:_PRAY_TEXT.r_closing,slot});
     } else if(slot==='midday'){
-      P.push(_prayPage('pause',{title:'Pause',text:_PRAY_TEXT.r_open_midday}));
-      P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
-      P.push(_prayPage('complete',{title:'Carry on',text:_PRAY_TEXT.r_closing,slot}));
+      add('pause',{title:'Pause',text:_PRAY_TEXT.r_open_midday},true);
+      add('std',{title:'Centering',text:_PRAY_TEXT.r_centering});
+      add('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)});
+      add('complete',{title:'Carry on',text:_PRAY_TEXT.r_closing,slot});
     } else {
-      P.push(_prayPage('std',{title:'Arrive',text:_PRAY_TEXT.r_open_evening}));
-      P.push(_prayPage('std',{title:'Looking back',text:_PRAY_TEXT.r_lookback}));
-      P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
-      P.push(_prayPage('complete',{title:'Rest now',text:_PRAY_TEXT.r_closing,slot}));
+      add('std',{title:'Arrive',text:_PRAY_TEXT.r_open_evening});
+      add('std',{title:'Looking back',text:_PRAY_TEXT.r_lookback});
+      add('std',{title:'Centering',text:_PRAY_TEXT.r_centering});
+      add('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)});
+      add('complete',{title:'Rest now',text:_PRAY_TEXT.r_closing,slot});
     }
   }
   return P;
 }
-let _prayerTimerId=null, _prayerSlot='', _prayerMode='';
+let _prayerTimerId=null, _prayerSlot='', _prayerMode='', _prayerStep=0, _prayerPages=[];
 function openPrayer(slot){
-  _prayerSlot=slot; _prayerMode=_restMode();
-  const pages=_buildPrayerPages(_prayerMode,slot);
-  const dots=pages.map((_,i)=>`<span style="width:7px;height:7px;border-radius:50%;background:#fff;opacity:${i===0?1:0.4};transition:opacity .2s"></span>`).join('');
+  _prayerSlot=slot; _prayerMode=_restMode(); _prayerStep=0;
+  _prayerPages=_buildPrayerPages(_prayerMode,slot);
+  const panels=_prayerPages.map((p,i)=>`<div class="pr-panel" style="position:absolute;inset:0;opacity:${i===0?1:0};transition:opacity .55s ease;pointer-events:${i===0?'auto':'none'}">${p.h}</div>`).join('');
   const ov=document.createElement('div');
   ov.id='prayer-overlay';
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
-  ov.innerHTML=`<div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:.1;pointer-events:none;transition:opacity .25s"></div>
-    <div id="prayer-scroller" style="position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none">${pages.join('')}</div>
-    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:5">
+  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:translateX(-50%) scale(.82);opacity:.45}50%{transform:translateX(-50%) scale(1.12);opacity:.9}}</style>
+    <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
+    <div id="pr-ring" style="position:absolute;top:10%;left:50%;width:128px;height:128px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);pointer-events:none;opacity:0;transition:opacity .5s;animation:prBreathe 11s ease-in-out infinite"><div style="position:absolute;inset:13px;border-radius:50%;border:1px solid rgba(255,255,255,.3)"></div></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
+    <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
+    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:6">
       <button onclick="prayerHome()" aria-label="Home" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5l9-8 9 8M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/></svg></button>
-      <div id="prayer-dots" style="flex:1;display:flex;gap:9px;justify-content:center">${dots}</div>
-      <div style="width:24px;flex:none"></div>
+      <button id="pr-continue" onclick="prayerNext()" style="flex:1;padding:13px;border-radius:13px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);color:#fff;font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:.02em;cursor:pointer">Continue</button>
+      <div style="width:26px;flex:none"></div>
     </div>`;
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
-  const sc=ov.querySelector('#prayer-scroller');
-  sc.addEventListener('scroll',_prayerScroll,{passive:true});
+  _renderPrayStep();
 }
-function _prayerScroll(){
-  const sc=document.getElementById('prayer-scroller'); if(!sc)return;
-  const max=sc.scrollWidth-sc.clientWidth, p=max>0?sc.scrollLeft/max:0;
-  const dk2=document.getElementById('prayer-dark'); if(dk2)dk2.style.opacity=(0.1+p*0.8).toFixed(3);
-  const idx=Math.round(sc.scrollLeft/Math.max(1,sc.clientWidth));
-  const dots=document.querySelectorAll('#prayer-dots>span'); dots.forEach((d,i)=>d.style.opacity=i===idx?'1':'0.4');
+function _renderPrayStep(){
+  const ov=document.getElementById('prayer-overlay'); if(!ov)return;
+  const n=_prayerPages.length;
+  ov.querySelectorAll('#prayer-stage > .pr-panel').forEach((el,i)=>{const on=i===_prayerStep;el.style.opacity=on?1:0;el.style.pointerEvents=on?'auto':'none';if(on)el.scrollTop=0;});
+  const dk2=document.getElementById('prayer-dark'); if(dk2)dk2.style.opacity=(n>1?_prayerStep/(n-1)*0.6:0).toFixed(3);
+  const pg=document.getElementById('pr-progress'); if(pg)pg.style.height=((_prayerStep+1)/n*100)+'%';
+  const ring=document.getElementById('pr-ring'); if(ring)ring.style.opacity=_prayerPages[_prayerStep].ring?1:0;
+  const btn=document.getElementById('pr-continue');
+  if(btn){const last=_prayerStep===n-1; btn.textContent=last?'Complete':'Continue';
+    btn.onclick=last?function(){completePrayer(_prayerSlot);}:prayerNext;
+    if(last){btn.style.background='rgba(255,255,255,.94)';btn.style.color='#222';btn.style.border='none';}
+    else{btn.style.background='rgba(255,255,255,.14)';btn.style.color='#fff';btn.style.border='1px solid rgba(255,255,255,.4)';}}
 }
+function prayerNext(){if(_prayerStep<_prayerPages.length-1){_prayerStep++;_renderPrayStep();}}
 function closePrayer(){
   if(_prayerTimerId){clearInterval(_prayerTimerId);_prayerTimerId=null;}
   const ov=document.getElementById('prayer-overlay'); if(ov)ov.remove();
