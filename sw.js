@@ -1,4 +1,4 @@
-const VERSION = '20260620-prayer-reimagined';
+const VERSION = '20260620-prayer-ring-fix';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

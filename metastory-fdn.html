@@ -9237,7 +9237,7 @@ function openPrayer(slot){
   const ov=document.createElement('div');
   ov.id='prayer-overlay';
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
-  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:translateX(-50%) scale(.82);opacity:.45}50%{transform:translateX(-50%) scale(1.12);opacity:.9}}</style>
+  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:translateX(-50%) scale(.82)}50%{transform:translateX(-50%) scale(1.12)}}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pr-ring" style="position:absolute;top:10%;left:50%;width:128px;height:128px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);pointer-events:none;opacity:0;transition:opacity .5s;animation:prBreathe 11s ease-in-out infinite"><div style="position:absolute;inset:13px;border-radius:50%;border:1px solid rgba(255,255,255,.3)"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
