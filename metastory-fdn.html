@@ -9035,7 +9035,7 @@ Exactly 3 daily (morning, midday, evening), 2-3 weekly, 1-2 monthly, 1-2 annual.
 // daily Scripture) or Reflective (non-religious, same aesthetic). Background deepens
 // as you move through the pages. Completion feeds the "Daily prayer" Progress metric.
 function _restMode(){const m=lsGet('_restMode','christian');return m==='other'?'other':'christian';}
-function toggleRestMode(){lsSet('_restMode',_restMode()==='christian'?'other':'christian');try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}rRest();}
+function setPrayerMode(m){lsSet('_restMode',m==='other'?'other':'christian');try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}rRest();}
 function _slotTitle(slot,mode){
   const h=new Date().getHours();
   if(mode==='other')return slot==='morning'?'Morning Stillness':slot==='midday'?'Midday Pause':'Evening Stillness';
@@ -9053,16 +9053,16 @@ function _prayerLauncherHTML(){
   const slot=_slotNow(), mode=_restMode(), title=_slotTitle(slot,mode);
   const done=_prayerDoneToday().includes(slot);
   const dstr=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
-  return `<div style="border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative;min-height:178px;background:${_prayerBg(slot)};display:flex;flex-direction:column;justify-content:flex-end;padding:18px">
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.5))"></div>
+  const pill=(m,label)=>{const on=mode===m;return `<button onclick="event.stopPropagation();setPrayerMode('${m}')" style="flex:1;padding:7px 4px;border:none;border-radius:7px;background:${on?'rgba(255,255,255,.92)':'transparent'};color:${on?'#222':'rgba(255,255,255,.92)'};font-family:var(--font-sans);font-size:12.5px;font-weight:700;cursor:pointer">${label}</button>`;};
+  return `<div style="border-radius:16px;overflow:hidden;margin-bottom:12px;position:relative;min-height:200px;background:${_prayerBg(slot)};display:flex;flex-direction:column;justify-content:flex-end;padding:18px">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.52))"></div>
     <div style="position:relative">
-      <div style="font-size:12px;color:rgba(255,255,255,.88);font-weight:600;margin-bottom:3px">${dstr}</div>
-      <div style="font-size:27px;font-weight:800;color:#fff;line-height:1.04;margin-bottom:13px">${title}</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn" style="background:rgba(255,255,255,.93);color:#222;border:none;flex:1;font-weight:700" onclick="openPrayer('${slot}')">${done?'Pray again':'Begin'}</button>
-        <button class="btn" style="background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.45);white-space:nowrap" onclick="toggleRestMode()">${mode==='christian'?'Christian':'Reflective'}</button>
-      </div>
-      ${done?`<div style="font-size:11.5px;color:rgba(255,255,255,.9);margin-top:9px">Completed today</div>`:''}
+      <div style="font-family:var(--font-sans);font-size:12px;color:rgba(255,255,255,.88);font-weight:600;letter-spacing:.02em;margin-bottom:3px">${dstr}</div>
+      <div style="font-family:var(--font-serif);font-size:30px;font-weight:500;color:#fff;line-height:1.02;letter-spacing:-.3px;margin-bottom:12px">${title}</div>
+      <div style="font-family:var(--font-sans);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:rgba(255,255,255,.78);margin-bottom:5px">Choose your path</div>
+      <div style="display:flex;gap:3px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.32);border-radius:9px;padding:3px;margin-bottom:11px">${pill('christian','Christian')}${pill('other','Reflective')}</div>
+      <button class="btn" style="background:rgba(255,255,255,.94);color:#222;border:none;width:100%;font-family:var(--font-sans);font-weight:700" onclick="openPrayer('${slot}')">${done?'Pray again':'Begin '+title}</button>
+      ${done?`<div style="font-family:var(--font-sans);font-size:11.5px;color:rgba(255,255,255,.9);margin-top:9px">Completed today</div>`:''}
     </div>
   </div>`;
 }
@@ -9093,27 +9093,29 @@ const _PRAY_TEXT={
 };
 function _prayPage(kind,opts){
   opts=opts||{};
-  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:84px 28px 96px;color:#fff;-webkit-overflow-scrolling:touch">${inner}</div>`;
-  const H=t=>`<div style="font-size:42px;font-weight:800;line-height:1.04;margin-bottom:22px;text-shadow:0 1px 12px rgba(0,0,0,.25)">${t}</div>`;
-  const body=t=>`<div style="font-size:19px;line-height:1.6;white-space:pre-line;text-shadow:0 1px 10px rgba(0,0,0,.3)">${t}</div>`;
+  const SERIF='font-family:var(--font-serif)';
+  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:84px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:22px;text-shadow:0 1px 14px rgba(0,0,0,.28)">${t}</div>`;
+  const body=t=>`<div style="${SERIF};font-size:22px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.3)">${t}</div>`;
+  const ghostBtn=(label,onclick)=>`<button onclick="${onclick}" style="width:100%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:var(--font-sans);font-size:15px;font-weight:600;letter-spacing:.02em;padding:14px;border-radius:12px;cursor:pointer">${label}</button>`;
   if(kind==='title'){
-    return wrap(`<div style="margin-top:40px"><div style="font-size:54px;font-weight:800;line-height:1.0;letter-spacing:-1px;text-shadow:0 2px 16px rgba(0,0,0,.3)">${opts.title}</div>
-      <div style="width:120px;height:5px;background:#fff;border-radius:3px;margin:14px 0 16px;opacity:.95"></div>
-      <div style="font-size:17px;color:rgba(255,255,255,.92)">${opts.date}</div></div>`);
+    return wrap(`<div style="margin-top:40px"><div style="${SERIF};font-size:54px;font-weight:500;line-height:1.0;letter-spacing:-.5px;text-shadow:0 2px 18px rgba(0,0,0,.3)">${opts.title}</div>
+      <div style="width:92px;height:3px;background:rgba(255,255,255,.9);border-radius:3px;margin:16px 0 16px"></div>
+      <div style="font-family:var(--font-sans);font-size:15px;letter-spacing:.02em;color:rgba(255,255,255,.92)">${opts.date}</div></div>`);
   }
   if(kind==='pause'){
-    return wrap(H(opts.title||'Be still')+body(opts.text||'')+`<div id="pr-timer-wrap" style="margin-top:26px"><button onclick="startPrayerTimer(120)" style="width:100%;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;font-size:17px;font-weight:700;padding:14px;border-radius:12px;cursor:pointer">Begin</button></div>`);
+    return wrap(H(opts.title||'Be still')+body(opts.text||'')+`<div id="pr-timer-wrap" style="margin-top:28px">${ghostBtn('Begin','startPrayerTimer(120)')}</div>`);
   }
   if(kind==='lords'){
     let h=H("The Lord's Prayer");
-    _LP_LINES.forEach(l=>{h+=`<div style="margin-bottom:20px"><div style="font-size:20px;font-weight:700;line-height:1.4;text-shadow:0 1px 10px rgba(0,0,0,.3)">${l[0]}</div><div style="font-size:14.5px;font-style:italic;color:rgba(255,255,255,.82);margin-top:5px;line-height:1.45">${l[1]}</div></div>`;});
+    _LP_LINES.forEach(l=>{h+=`<div style="margin-bottom:20px"><div style="${SERIF};font-size:23px;font-weight:500;line-height:1.34;text-shadow:0 1px 10px rgba(0,0,0,.3)">${l[0]}</div><div style="font-family:var(--font-sans);font-size:13.5px;font-style:italic;color:rgba(255,255,255,.8);margin-top:6px;line-height:1.45">${l[1]}</div></div>`;});
     return wrap(h);
   }
   if(kind==='scripture'){
     return wrap(H(opts.title||'Scripture')+`<div id="pr-scripture">${opts.body||''}</div>`);
   }
   if(kind==='complete'){
-    return wrap(H(opts.title||'Amen')+body(opts.text||'')+`<div style="margin-top:26px"><button onclick="completePrayer('${opts.slot}')" style="width:100%;background:rgba(255,255,255,.93);color:#222;font-size:17px;font-weight:800;padding:14px;border:none;border-radius:12px;cursor:pointer">Complete</button></div>`);
+    return wrap(H(opts.title||'Amen')+body(opts.text||'')+`<div style="margin-top:28px"><button onclick="completePrayer('${opts.slot}')" style="width:100%;background:rgba(255,255,255,.94);color:#222;font-family:var(--font-sans);font-size:15px;font-weight:700;letter-spacing:.02em;padding:14px;border:none;border-radius:12px;cursor:pointer">Complete</button></div>`);
   }
   return wrap(H(opts.title)+body(opts.text||''));
 }
@@ -9175,7 +9177,7 @@ function openPrayer(slot){
   ov.innerHTML=`<div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:.1;pointer-events:none;transition:opacity .25s"></div>
     <div id="prayer-scroller" style="position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none">${pages.join('')}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:5">
-      <button onclick="closePrayer()" aria-label="Close" style="background:none;border:none;color:#fff;font-size:24px;line-height:1;cursor:pointer;flex:none">&#9776;</button>
+      <button onclick="prayerHome()" aria-label="Home" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5l9-8 9 8M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/></svg></button>
       <div id="prayer-dots" style="flex:1;display:flex;gap:9px;justify-content:center">${dots}</div>
       <div style="width:24px;flex:none"></div>
     </div>`;
@@ -9198,6 +9200,7 @@ function closePrayer(){
   document.body.style.overflow='';
 }
 function completePrayer(slot){_prayerMarkDone(slot);closePrayer();showToast('Prayer complete');try{rRest();}catch(e){}}
+function prayerHome(){closePrayer();try{if(typeof goToday==='function')goToday();if(typeof goPage==='function')goPage('today');}catch(e){}}
 function startPrayerTimer(sec){
   const wrap=document.getElementById('pr-timer-wrap'); if(!wrap)return;
   let left=sec;
