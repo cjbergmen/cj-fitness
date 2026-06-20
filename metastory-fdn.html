@@ -9239,7 +9239,7 @@ function openPrayer(slot){
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
   ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
-    <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
+    <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:6">
@@ -9249,12 +9249,19 @@ function openPrayer(slot){
     </div>`;
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
+  ov.querySelectorAll('.pr-page').forEach(p=>p.addEventListener('scroll',_prayRingFade,{passive:true}));
   _renderPrayStep();
+}
+function _prayRingFade(e){
+  const ring=document.getElementById('pr-ring'); if(!ring)return;
+  const st=(e.target&&e.target.scrollTop)||0;
+  ring.style.opacity=Math.max(0,1-st/100).toFixed(2);
 }
 function _renderPrayStep(){
   const ov=document.getElementById('prayer-overlay'); if(!ov)return;
   const n=_prayerPages.length;
-  ov.querySelectorAll('#prayer-stage > .pr-panel').forEach((el,i)=>{const on=i===_prayerStep;el.style.opacity=on?1:0;el.style.pointerEvents=on?'auto':'none';if(on)el.scrollTop=0;});
+  ov.querySelectorAll('#prayer-stage > .pr-panel').forEach((el,i)=>{const on=i===_prayerStep;el.style.opacity=on?1:0;el.style.pointerEvents=on?'auto':'none';const pg=el.querySelector('.pr-page');if(on&&pg)pg.scrollTop=0;});
+  const ring=document.getElementById('pr-ring'); if(ring)ring.style.opacity=1;
   const dk2=document.getElementById('prayer-dark'); if(dk2)dk2.style.opacity=(n>1?_prayerStep/(n-1)*0.6:0).toFixed(3);
   const pg=document.getElementById('pr-progress'); if(pg)pg.style.height=((_prayerStep+1)/n*100)+'%';
   const btn=document.getElementById('pr-continue');
