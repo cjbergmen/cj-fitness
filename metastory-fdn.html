@@ -9162,7 +9162,8 @@ function _prayPage(kind,opts){
       <div style="font-family:var(--font-sans);font-size:15px;letter-spacing:.02em;color:rgba(255,255,255,.92)">${opts.date}</div></div>`);
   }
   if(kind==='pause'){
-    return wrap(H(opts.title||'Be still')+body(opts.text||'')+`<div id="pr-timer-wrap" style="margin-top:28px">${ghostBtn('Begin','startPrayerTimer(120)')}</div>`);
+    const ring=`<div style="display:flex;justify-content:center;margin:40px 0 8px"><div style="position:relative;width:150px;height:150px;animation:prBreathe 11s ease-in-out infinite"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5)"></div><div style="position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(255,255,255,.28)"></div></div></div>`;
+    return wrap(H(opts.title||'Be still')+body(opts.text||'')+ring+`<div id="pr-timer-wrap" style="margin-top:22px">${ghostBtn('Begin 2 minutes','startPrayerTimer(120)')}</div>`);
   }
   if(kind==='lords'){
     let h=H("The Lord's Prayer");
@@ -9237,9 +9238,8 @@ function openPrayer(slot){
   const ov=document.createElement('div');
   ov.id='prayer-overlay';
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
-  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:translateX(-50%) scale(.82)}50%{transform:translateX(-50%) scale(1.12)}}</style>
+  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
-    <div id="pr-ring" style="position:absolute;top:10%;left:50%;width:128px;height:128px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);pointer-events:none;opacity:0;transition:opacity .5s;animation:prBreathe 11s ease-in-out infinite"><div style="position:absolute;inset:13px;border-radius:50%;border:1px solid rgba(255,255,255,.3)"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:6">
@@ -9257,7 +9257,6 @@ function _renderPrayStep(){
   ov.querySelectorAll('#prayer-stage > .pr-panel').forEach((el,i)=>{const on=i===_prayerStep;el.style.opacity=on?1:0;el.style.pointerEvents=on?'auto':'none';if(on)el.scrollTop=0;});
   const dk2=document.getElementById('prayer-dark'); if(dk2)dk2.style.opacity=(n>1?_prayerStep/(n-1)*0.6:0).toFixed(3);
   const pg=document.getElementById('pr-progress'); if(pg)pg.style.height=((_prayerStep+1)/n*100)+'%';
-  const ring=document.getElementById('pr-ring'); if(ring)ring.style.opacity=_prayerPages[_prayerStep].ring?1:0;
   const btn=document.getElementById('pr-continue');
   if(btn){const last=_prayerStep===n-1; btn.textContent=last?'Complete':'Continue';
     btn.onclick=last?function(){completePrayer(_prayerSlot);}:prayerNext;
