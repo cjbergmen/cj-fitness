@@ -9250,6 +9250,8 @@ function openPrayer(slot){
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
   ov.querySelectorAll('.pr-page').forEach(p=>p.addEventListener('scroll',_prayRingFade,{passive:true}));
+  ov.addEventListener('touchstart',_prTouchStart,{passive:true});
+  ov.addEventListener('touchend',_prTouchEnd,{passive:true});
   _renderPrayStep();
 }
 function _prayRingFade(e){
@@ -9271,6 +9273,10 @@ function _renderPrayStep(){
     else{btn.style.background='rgba(255,255,255,.14)';btn.style.color='#fff';btn.style.border='1px solid rgba(255,255,255,.4)';}}
 }
 function prayerNext(){if(_prayerStep<_prayerPages.length-1){_prayerStep++;_renderPrayStep();}}
+function prayerPrev(){if(_prayerStep>0){_prayerStep--;_renderPrayStep();}}
+let _prTouchX=0,_prTouchY=0;
+function _prTouchStart(e){const t=e.touches&&e.touches[0];if(t){_prTouchX=t.clientX;_prTouchY=t.clientY;}}
+function _prTouchEnd(e){const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_prTouchX,dy=t.clientY-_prTouchY;if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)prayerNext();else prayerPrev();}}
 function closePrayer(){
   if(_prayerTimerId){clearInterval(_prayerTimerId);_prayerTimerId=null;}
   const ov=document.getElementById('prayer-overlay'); if(ov)ov.remove();
