@@ -9152,18 +9152,17 @@ function _prayPage(kind,opts){
   opts=opts||{};
   const SERIF='font-family:var(--font-serif)';
   const attrib=s=>s?`<div style="font-family:var(--font-sans);font-size:13px;letter-spacing:.02em;color:rgba(255,255,255,.72);margin-top:18px">— ${s}</div>`:'';
-  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:84px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:182px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
   const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:22px;text-shadow:0 1px 14px rgba(0,0,0,.28)">${t}</div>`;
   const body=t=>`<div style="${SERIF};font-size:22px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.3)">${t}</div>`;
   const ghostBtn=(label,onclick)=>`<button onclick="${onclick}" style="width:100%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:var(--font-sans);font-size:15px;font-weight:600;letter-spacing:.02em;padding:14px;border-radius:12px;cursor:pointer">${label}</button>`;
   if(kind==='title'){
-    return wrap(`<div style="margin-top:40px"><div style="${SERIF};font-size:54px;font-weight:500;line-height:1.0;letter-spacing:-.5px;text-shadow:0 2px 18px rgba(0,0,0,.3)">${opts.title}</div>
+    return wrap(`<div><div style="${SERIF};font-size:54px;font-weight:500;line-height:1.0;letter-spacing:-.5px;text-shadow:0 2px 18px rgba(0,0,0,.3)">${opts.title}</div>
       <div style="width:92px;height:3px;background:rgba(255,255,255,.9);border-radius:3px;margin:16px 0 16px"></div>
       <div style="font-family:var(--font-sans);font-size:15px;letter-spacing:.02em;color:rgba(255,255,255,.92)">${opts.date}</div></div>`);
   }
   if(kind==='pause'){
-    const ring=`<div style="display:flex;justify-content:center;margin:40px 0 8px"><div style="position:relative;width:150px;height:150px;animation:prBreathe 11s ease-in-out infinite"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5)"></div><div style="position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(255,255,255,.28)"></div></div></div>`;
-    return wrap(H(opts.title||'Be still')+body(opts.text||'')+ring+`<div id="pr-timer-wrap" style="margin-top:22px">${ghostBtn('Begin 2 minutes','startPrayerTimer(120)')}</div>`);
+    return wrap(H(opts.title||'Be still')+body(opts.text||'')+`<div id="pr-timer-wrap" style="margin-top:26px">${ghostBtn('Begin 2 minutes','startPrayerTimer(120)')}</div>`);
   }
   if(kind==='lords'){
     let h=H("The Lord's Prayer");
@@ -9240,6 +9239,7 @@ function openPrayer(slot){
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
   ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
+    <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:6">

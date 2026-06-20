@@ -1,4 +1,4 @@
-const VERSION = '20260620-prayer-ring-inflow';
+const VERSION = '20260620-prayer-ring-top-constant';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
