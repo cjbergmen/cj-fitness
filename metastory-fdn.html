@@ -9250,7 +9250,7 @@ function openPrayer(slot){
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
-      <button onclick="prayerHome()" aria-label="Home" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5l9-8 9 8M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/></svg></button>
+      <button onclick="prayerMenu()" aria-label="Prayer times menu" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <div id="pr-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
       <button id="pr-finish" onclick="completePrayer(_prayerSlot)" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
     </div>`;
@@ -9283,7 +9283,7 @@ function prayerNext(){if(_prayerStep<_prayerPages.length-1){_prayerStep++;_rende
 function prayerPrev(){if(_prayerStep>0){_prayerStep--;_renderPrayStep();}}
 let _prTouchX=0,_prTouchY=0;
 function _prTouchStart(e){const t=e.touches&&e.touches[0];if(t){_prTouchX=t.clientX;_prTouchY=t.clientY;}}
-function _prTouchEnd(e){const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_prTouchX,dy=t.clientY-_prTouchY;if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)prayerNext();else prayerPrev();}}
+function _prTouchEnd(e){if(document.getElementById('pr-menu'))return;const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_prTouchX,dy=t.clientY-_prTouchY;if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)prayerNext();else prayerPrev();}}
 function closePrayer(){
   if(_prayerTimerId){clearInterval(_prayerTimerId);_prayerTimerId=null;}
   const ov=document.getElementById('prayer-overlay'); if(ov)ov.remove();
@@ -9291,6 +9291,29 @@ function closePrayer(){
 }
 function completePrayer(slot){_prayerMarkDone(slot);closePrayer();showToast('Prayer complete');try{rRest();}catch(e){}}
 function prayerHome(){closePrayer();try{if(typeof goToday==='function')goToday();if(typeof goPage==='function')goPage('today');}catch(e){}}
+function prayerMenu(){
+  const ov=document.getElementById('prayer-overlay'); if(!ov)return;
+  const existing=document.getElementById('pr-menu'); if(existing){existing.remove();return;}
+  const mode=_restMode();
+  const slots=[['morning','Morning'],['midday','Midday'],['evening','Evening']];
+  const row=(slot)=>{const on=slot===_prayerSlot;const title=_slotTitle(slot,mode);return `<button onclick="_prayerGoSlot('${slot}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px 17px;border:none;border-radius:14px;margin-bottom:8px;background:${on?'rgba(255,255,255,.95)':'rgba(255,255,255,.14)'};color:${on?'#222':'#fff'};font-family:var(--font-sans);font-size:15px;font-weight:600;cursor:pointer;text-align:left"><span>${title}</span>${on?'<span style="font-size:11px;font-weight:600;opacity:.6">Current</span>':''}</button>`;};
+  const m=document.createElement('div');
+  m.id='pr-menu';
+  m.style.cssText='position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,.45);animation:prFade .2s ease';
+  m.innerHTML=`<style>@keyframes prFade{from{opacity:0}to{opacity:1}}@keyframes prUp{from{transform:translateY(14px);opacity:.4}to{transform:translateY(0);opacity:1}}</style>
+    <div onclick="event.stopPropagation()" style="padding:20px 18px calc(22px + env(safe-area-inset-bottom));animation:prUp .22s ease">
+      <div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.72);margin:0 4px 12px">Prayer times</div>
+      ${slots.map(s=>row(s[0])).join('')}
+      <button onclick="prayerHome()" style="width:100%;padding:14px;border:1px solid rgba(255,255,255,.35);border-radius:14px;background:transparent;color:#fff;font-family:var(--font-sans);font-size:14px;font-weight:600;cursor:pointer;margin-top:6px">Close prayer</button>
+    </div>`;
+  m.addEventListener('click',()=>m.remove());
+  ov.appendChild(m);
+}
+function _prayerGoSlot(slot){
+  const m=document.getElementById('pr-menu'); if(m)m.remove();
+  if(slot===_prayerSlot)return;
+  closePrayer(); openPrayer(slot);
+}
 function startPrayerTimer(sec){
   const wrap=document.getElementById('pr-timer-wrap'); if(!wrap)return;
   let left=sec;
