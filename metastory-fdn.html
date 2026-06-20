@@ -9091,9 +9091,67 @@ const _PRAY_TEXT={
   r_centering:'A breath to return to, as long as you like:\n\nBreathing in — I am here.\nBreathing out — I let go.',
   r_closing:'Carry this stillness with you into whatever comes next.'
 };
+// ── Approved content pools (Batch 1) — rotate by day-of-year, offset per time slot ──
+// Opening prayers: church fathers / historic saints (named only when certain).
+const REST_OPENINGS=[
+  {t:"You have made us for yourself, O Lord, and our heart is restless until it rests in you.",a:"Augustine of Hippo",s:"Confessions I.1"},
+  {t:"Late have I loved you, beauty so ancient and so new; late have I loved you. You were within me, but I was outside, and there I sought you.",a:"Augustine of Hippo",s:"Confessions X.27"},
+  {t:"Breathe in me, O Holy Spirit, that my thoughts may all be holy. Act in me, O Holy Spirit, that my work, too, may be holy. Draw my heart, O Holy Spirit, that I love but what is holy.",a:"",s:""},
+  {t:"O Lord, teach us to ask rightly for the right things. Steer the vessel of our life toward yourself, the tranquil haven of all storm-tossed souls. Show us the course wherein we should go.",a:"",s:""},
+  {t:"O Lord, who has mercy upon all, take away from me my sins, and mercifully kindle in me the fire of your Holy Spirit. Take away from me the heart of stone, and give me a heart of flesh.",a:"",s:""},
+  {t:"We bless you, O God most high and Lord of mercy, who are always doing great and inscrutable things with us, glorious and wonderful.",a:"",s:""},
+  {t:"O Lord my God, teach my heart this day where and how to seek you, where and how to find you. I cannot seek you unless you teach me, nor find you unless you show yourself to me.",a:"Anselm of Canterbury",s:"Proslogion"},
+  {t:"Grant me, O Lord my God, a mind to know you, a heart to seek you, wisdom to find you, a way of life pleasing to you, and a hope of finally embracing you.",a:"Thomas Aquinas",s:""},
+  {t:"Creator of all things, true source of light and wisdom, grant to my mind your light, that I may see you; to my heart your warmth, that I may love you.",a:"",s:""},
+  {t:"Most High, glorious God, enlighten the darkness of my heart, and give me right faith, certain hope, and perfect charity, that I may carry out your holy and true command.",a:"Francis of Assisi",s:"Prayer before the Crucifix"},
+  {t:"Grant me, O Lord, to know what I ought to know, to love what I ought to love, to praise what delights you most, and to do what pleases you.",a:"Thomas à Kempis",s:"The Imitation of Christ"},
+  {t:"O Lord and Master of my life, take from me the spirit of sloth, faint-heartedness, and idle talk. Give rather the spirit of integrity, humility, patience, and love to your servant.",a:"Ephrem the Syrian",s:"Prayer of St. Ephrem"},
+  {t:"O gracious and holy Father, give us wisdom to perceive you, diligence to seek you, patience to wait for you, eyes to behold you, a heart to meditate upon you, and a life to proclaim you.",a:"",s:""},
+  {t:"Christ be with me, Christ within me, Christ behind me, Christ before me, Christ beside me, Christ to comfort and restore me.",a:"",s:"St. Patrick's Breastplate"},
+  {t:"Thanks be to you, my Lord Jesus Christ, for all the benefits you have given me. O most merciful friend and brother, may I know you more clearly, love you more dearly, and follow you more nearly, day by day.",a:"Richard of Chichester",s:""},
+  {t:"Grant us, Lord, to hope on your name, the wellspring of all creation. Open the eyes of our hearts to know you, who alone are highest among the high, holy among the holy.",a:"",s:"from 1 Clement"}
+];
+// Verses of the day: full World English Bible text (public domain), 'Yahweh' rendered 'the LORD'.
+const REST_VERSES=[
+  {ref:"Psalm 23:1-3",t:"The LORD is my shepherd: I shall lack nothing. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He guides me in the paths of righteousness for his name's sake."},
+  {ref:"Lamentations 3:22-23",t:"It is because of the LORD's loving kindnesses that we are not consumed, because his compassion doesn't fail. They are new every morning. Great is your faithfulness."},
+  {ref:"Zephaniah 3:17",t:"The LORD, your God, is among you, a mighty one who will save. He will rejoice over you with joy. He will calm you in his love. He will rejoice over you with singing."},
+  {ref:"Matthew 11:28-29",t:"Come to me, all you who labor and are heavily burdened, and I will give you rest. Take my yoke upon you, and learn from me, for I am gentle and humble in heart; and you will find rest for your souls."},
+  {ref:"Philippians 4:6-7",t:"In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus."},
+  {ref:"Isaiah 40:31",t:"But those who wait for the LORD will renew their strength. They will mount up with wings like eagles. They will run, and not be weary. They will walk, and not faint."},
+  {ref:"Psalm 121:1-2",t:"I will lift up my eyes to the hills. Where does my help come from? My help comes from the LORD, who made heaven and earth."},
+  {ref:"Psalm 46:10",t:"Be still, and know that I am God. I will be exalted among the nations. I will be exalted in the earth."},
+  {ref:"Proverbs 3:5-6",t:"Trust in the LORD with all your heart, and don't lean on your own understanding. In all your ways acknowledge him, and he will make your paths straight."},
+  {ref:"Psalm 4:8",t:"In peace I will both lay myself down and sleep, for you, the LORD alone, make me live in safety."},
+  {ref:"Psalm 90:14",t:"Satisfy us in the morning with your loving kindness, that we may rejoice and be glad all our days."}
+];
+// Reflective readings: public-domain universal voices.
+const REST_REFLECTIONS=[
+  {t:"Nowhere can a man find a quieter or more untroubled retreat than in his own soul.",a:"Marcus Aurelius",s:"Meditations IV.3"},
+  {t:"Look within. Within is the fountain of good, and it will ever bubble up, if you will ever dig.",a:"Marcus Aurelius",s:"Meditations VII.59"},
+  {t:"We suffer more often in imagination than in reality.",a:"Seneca",s:"Letters to Lucilius"},
+  {t:"Men are disturbed not by things, but by the views which they take of things.",a:"Epictetus",s:"Enchiridion 5"},
+  {t:"The highest excellence is like water, which benefits all things and does not strive.",a:"Lao Tzu",s:"Tao Te Ching, ch. 8"},
+  {t:"The journey of a thousand miles begins with a single step.",a:"Lao Tzu",s:"Tao Te Ching, ch. 64"},
+  {t:"When you know a thing, to hold that you know it; and when you do not know a thing, to allow that you do not know it — this is knowledge.",a:"Confucius",s:"Analects"},
+  {t:"The butterfly counts not months but moments, and has time enough.",a:"Rabindranath Tagore",s:"Stray Birds"},
+  {t:"Let me not pray to be sheltered from dangers, but to be fearless in facing them.",a:"Rabindranath Tagore",s:"Fruit-Gathering"},
+  {t:"I went to the woods because I wished to live deliberately, to front only the essential facts of life, and see what it had to teach.",a:"Henry David Thoreau",s:"Walden"},
+  {t:"Live in each season as it passes; breathe the air, drink the drink, taste the fruit.",a:"Henry David Thoreau",s:"Journal"},
+  {t:"Write it on your heart that every day is the best day in the year.",a:"Ralph Waldo Emerson",s:"Essays"},
+  {t:"I exist as I am, that is enough.",a:"Walt Whitman",s:"Leaves of Grass"},
+  {t:"In the dew of little things the heart finds its morning and is refreshed.",a:"Kahlil Gibran",s:"The Prophet"},
+  {t:"In every walk with nature one receives far more than he seeks.",a:"John Muir",s:""},
+  {t:"Come forth into the light of things, let Nature be your teacher.",a:"William Wordsworth",s:"The Tables Turned"}
+];
+function _doy(){const n=new Date();return Math.floor((n-new Date(n.getFullYear(),0,0))/86400000);}
+function _restPick(arr,off){const n=arr.length;return arr[(((_doy()+(off||0))%n)+n)%n];}
+function _attrFrom(o){if(o.a)return o.a+(o.s?' · '+o.s:'');return o.s?'Traditional · '+o.s:'Traditional';}
+
 function _prayPage(kind,opts){
   opts=opts||{};
   const SERIF='font-family:var(--font-serif)';
+  const attrib=s=>s?`<div style="font-family:var(--font-sans);font-size:13px;letter-spacing:.02em;color:rgba(255,255,255,.72);margin-top:18px">— ${s}</div>`:'';
   const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:84px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
   const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:22px;text-shadow:0 1px 14px rgba(0,0,0,.28)">${t}</div>`;
   const body=t=>`<div style="${SERIF};font-size:22px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.3)">${t}</div>`;
@@ -9112,35 +9170,39 @@ function _prayPage(kind,opts){
     return wrap(h);
   }
   if(kind==='scripture'){
-    return wrap(H(opts.title||'Scripture')+`<div id="pr-scripture">${opts.body||''}</div>`);
+    return wrap(H(opts.title||'Scripture')+body(opts.text||'')+attrib(opts.attrib));
   }
   if(kind==='complete'){
     return wrap(H(opts.title||'Amen')+body(opts.text||'')+`<div style="margin-top:28px"><button onclick="completePrayer('${opts.slot}')" style="width:100%;background:rgba(255,255,255,.94);color:#222;font-family:var(--font-sans);font-size:15px;font-weight:700;letter-spacing:.02em;padding:14px;border:none;border-radius:12px;cursor:pointer">Complete</button></div>`);
   }
-  return wrap(H(opts.title)+body(opts.text||''));
+  return wrap(H(opts.title)+body(opts.text||'')+attrib(opts.attrib));
 }
 function _buildPrayerPages(mode,slot){
   const date=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
   const P=[]; const title=_slotTitle(slot,mode);
+  const off={morning:0,midday:1,evening:2}[slot]||0;
+  const opening=_restPick(REST_OPENINGS,off);
+  const verse=_restPick(REST_VERSES,off);
+  const reading=_restPick(REST_REFLECTIONS,off);
   P.push(_prayPage('title',{title,date}));
   if(mode==='christian'){
     if(slot==='morning'){
-      P.push(_prayPage('std',{title:'Opening Prayer',text:_PRAY_TEXT.open_morning}));
+      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
       P.push(_prayPage('pause',{title:'Be still',text:'Take the next two minutes and quiet your heart before the Lord. Ask him what he is saying to you today.'}));
       P.push(_prayPage('std',{title:'Confession',text:_PRAY_TEXT.confession}));
       P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture'));
+      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
       P.push(_prayPage('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot}));
     } else if(slot==='midday'){
-      P.push(_prayPage('std',{title:'Pause',text:_PRAY_TEXT.open_midday}));
+      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
       P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture'));
+      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
       P.push(_prayPage('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot}));
     } else {
-      P.push(_prayPage('std',{title:'Opening Prayer',text:_PRAY_TEXT.open_evening}));
+      P.push(_prayPage('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)}));
       P.push(_prayPage('std',{title:'Confession',text:_PRAY_TEXT.confession}));
       P.push(_prayPage('lords'));
-      P.push(_prayPage('scripture'));
+      P.push(_prayPage('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'}));
       P.push(_prayPage('complete',{title:'Peace at the last',text:_PRAY_TEXT.blessing,slot}));
     }
   } else {
@@ -9149,18 +9211,18 @@ function _buildPrayerPages(mode,slot){
       P.push(_prayPage('pause',{title:'Be still',text:'Take two minutes. Let your attention rest on your breath. There is nowhere else to be.'}));
       P.push(_prayPage('std',{title:'Intention',text:_PRAY_TEXT.r_intention}));
       P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading'}));
+      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
       P.push(_prayPage('complete',{title:'Go gently',text:_PRAY_TEXT.r_closing,slot}));
     } else if(slot==='midday'){
       P.push(_prayPage('pause',{title:'Pause',text:_PRAY_TEXT.r_open_midday}));
       P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading'}));
+      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
       P.push(_prayPage('complete',{title:'Carry on',text:_PRAY_TEXT.r_closing,slot}));
     } else {
       P.push(_prayPage('std',{title:'Arrive',text:_PRAY_TEXT.r_open_evening}));
       P.push(_prayPage('std',{title:'Looking back',text:_PRAY_TEXT.r_lookback}));
       P.push(_prayPage('std',{title:'Centering',text:_PRAY_TEXT.r_centering}));
-      P.push(_prayPage('scripture',{title:'Reading'}));
+      P.push(_prayPage('scripture',{title:'Reading',text:reading.t,attrib:_attrFrom(reading)}));
       P.push(_prayPage('complete',{title:'Rest now',text:_PRAY_TEXT.r_closing,slot}));
     }
   }
@@ -9185,7 +9247,6 @@ function openPrayer(slot){
   document.body.style.overflow='hidden';
   const sc=ov.querySelector('#prayer-scroller');
   sc.addEventListener('scroll',_prayerScroll,{passive:true});
-  _fetchPrayerReading(slot,_prayerMode);
 }
 function _prayerScroll(){
   const sc=document.getElementById('prayer-scroller'); if(!sc)return;
