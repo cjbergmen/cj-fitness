@@ -6950,8 +6950,12 @@ migrateStripPhotos();  // frees localStorage space before anything else writes
 migrateWorkoutPlan();
 migrateUTCData();
 initHeader();
-rToday();
-initLib();
+// rToday() uses helpers defined in the 2nd <script> block (e.g. _routineNow, _fmtClock).
+// At init that block hasn't loaded yet, so guard these calls — an uncaught throw here
+// would abort the rest of this script (leaving _mealComps etc. uninitialized and Log Food
+// broken). Today is re-rendered at the end of the 2nd block once everything is defined.
+try{rToday();}catch(e){}
+try{initLib();}catch(e){}
 // ── CLOUD IS THE SOURCE OF TRUTH FOR THE FOOD LIBRARY ──────────────────────
 // The old client-side rebuild/migrate/restore routines recomputed food
 // categories on every load and pushed them back to the cloud, so the library
@@ -6960,11 +6964,11 @@ initLib();
 // NOT auto-run anymore. The library is whatever the cloud holds; it changes
 // only on explicit user edits. (Functions kept for manual/legacy use.)
 // importHistoryToLib();  migrateLibCategories();  restoreLibCategories();
-autoRestoreIfEmpty();
+try{autoRestoreIfEmpty();}catch(e){}
 // Only check onboarding at startup if Firebase isn't configured — otherwise
 // the onAuthStateChanged handler calls checkOnboarding() after fbPullAll() finishes,
 // ensuring _onboardDone is already loaded before we decide to show the wizard.
-if(!fbAuth) checkOnboarding();
+if(!fbAuth) try{checkOnboarding();}catch(e){}
 // If Firebase hasn't resolved auth state in 1.5s, show sign-in screen
 if(fbAuth){
   setTimeout(()=>{
