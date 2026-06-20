@@ -9069,12 +9069,12 @@ function _prayerLauncherHTML(){
 
 // ── Liturgy content (public domain) ──
 const _LP_LINES=[
-  ['Our Father in heaven, hallowed be your name','Adore God for who he is.'],
-  ['Your kingdom come, your will be done, on earth as it is in heaven','Pray for his reign — in the world and in you.'],
-  ['Give us this day our daily bread','Ask him for what you need today.'],
-  ['And forgive us our debts, as we forgive our debtors','Receive mercy; release those who have wronged you.'],
-  ['And lead us not into temptation, but deliver us from evil','Ask for his guarding and his guidance.'],
-  ['For yours is the kingdom, the power, and the glory forever. Amen.','End where you began — with him.']
+  ['Our Father who art in heaven, hallowed be Your name','Adore God the Father for who He is and what He has done'],
+  ['Your kingdom come, Your will be done, on earth as it is in heaven','Confess to Jesus the ways you have failed to trust and obey Him'],
+  ['Give us this day our daily bread','Petition God the Father for your current physical, emotional, relational, and spiritual needs'],
+  ['And forgive us our debts as we have forgiven our debtors','Receive Christ\'s assurance of pardon, extend the grace you have received to those who have failed or hurt you'],
+  ['And lead us not into temptation, but deliver us from evil','Ask God the Holy Spirit to guide you toward righteousness and bring conviction where needed'],
+  ['For Yours is the kingdom, the power, and the glory forever. Amen.','']
 ];
 const _PRAY_TEXT={
   open_morning:'This is another day, O Lord. I know not what it will bring forth, but make me ready, Lord, for whatever it may be. If I am to stand up, help me to stand bravely. If I am to sit still, help me to sit quietly. If I am to lie low, help me to do it patiently. And if I am to do nothing, help me to do it gallantly. Make these words more than words, and give me the Spirit of Jesus. Amen.',
@@ -9169,6 +9169,12 @@ function _prayPage(kind,opts){
     _LP_LINES.forEach(l=>{h+=`<div style="margin-bottom:20px"><div style="${SERIF};font-size:23px;font-weight:500;line-height:1.34;text-shadow:0 1px 10px rgba(0,0,0,.3)">${l[0]}</div><div style="font-family:var(--font-sans);font-size:13.5px;font-style:italic;color:rgba(255,255,255,.8);margin-top:6px;line-height:1.45">${l[1]}</div></div>`;});
     return wrap(h);
   }
+  if(kind==='lords_step'){
+    const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.72);margin-bottom:16px">The Lord's Prayer · ${opts.idx} of ${opts.total}</div>`;
+    const line=`<div style="${SERIF};font-size:30px;font-weight:500;line-height:1.2;letter-spacing:-.2px;text-shadow:0 1px 14px rgba(0,0,0,.3)">${opts.line}</div>`;
+    const prompt=opts.prompt?`<div style="font-family:var(--font-sans);font-size:17px;font-weight:400;line-height:1.62;color:rgba(255,255,255,.9);margin-top:24px;text-shadow:0 1px 10px rgba(0,0,0,.28)">${opts.prompt}</div>`:'';
+    return wrap(overline+line+prompt);
+  }
   if(kind==='scripture'){
     return wrap(H(opts.title||'Scripture')+body(opts.text||'')+attrib(opts.attrib));
   }
@@ -9185,24 +9191,25 @@ function _buildPrayerPages(mode,slot){
   const verse=_restPick(REST_VERSES,off);
   const reading=_restPick(REST_REFLECTIONS,off);
   const add=(k,o,ring)=>P.push({h:_prayPage(k,o||{}),ring:!!ring});
+  const addLords=()=>_LP_LINES.forEach((l,i)=>add('lords_step',{line:l[0],prompt:l[1],idx:i+1,total:_LP_LINES.length}));
   add('title',{title,date});
   if(mode==='christian'){
     if(slot==='morning'){
       add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
       add('pause',{title:'Be still',text:'Take the next two minutes and quiet your heart before the Lord. Ask him what he is saying to you today.'},true);
       add('std',{title:'Confession',text:_PRAY_TEXT.confession});
-      add('lords');
+      addLords();
       add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
       add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
     } else if(slot==='midday'){
       add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
-      add('lords');
+      addLords();
       add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
       add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
     } else {
       add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
       add('std',{title:'Confession',text:_PRAY_TEXT.confession});
-      add('lords');
+      addLords();
       add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
       add('complete',{title:'Peace at the last',text:_PRAY_TEXT.blessing,slot});
     }
@@ -9242,10 +9249,10 @@ function openPrayer(slot){
     <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
-    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 26px;z-index:6">
+    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
       <button onclick="prayerHome()" aria-label="Home" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5l9-8 9 8M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/></svg></button>
-      <button id="pr-continue" onclick="prayerNext()" style="flex:1;padding:13px;border-radius:13px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);color:#fff;font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:.02em;cursor:pointer">Continue</button>
-      <div style="width:26px;flex:none"></div>
+      <div id="pr-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
+      <button id="pr-finish" onclick="completePrayer(_prayerSlot)" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
     </div>`;
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
@@ -9266,12 +9273,12 @@ function _renderPrayStep(){
   const ring=document.getElementById('pr-ring'); if(ring)ring.style.opacity=1;
   const dk2=document.getElementById('prayer-dark'); if(dk2)dk2.style.opacity=(n>1?_prayerStep/(n-1)*0.6:0).toFixed(3);
   const pg=document.getElementById('pr-progress'); if(pg)pg.style.height=((_prayerStep+1)/n*100)+'%';
-  const btn=document.getElementById('pr-continue');
-  if(btn){const last=_prayerStep===n-1; btn.textContent=last?'Complete':'Continue';
-    btn.onclick=last?function(){completePrayer(_prayerSlot);}:prayerNext;
-    if(last){btn.style.background='rgba(255,255,255,.94)';btn.style.color='#222';btn.style.border='none';}
-    else{btn.style.background='rgba(255,255,255,.14)';btn.style.color='#fff';btn.style.border='1px solid rgba(255,255,255,.4)';}}
+  const last=_prayerStep===n-1;
+  const dots=document.getElementById('pr-dots');
+  if(dots){let dh='';for(let i=0;i<n;i++){const on=i===_prayerStep;dh+=`<button onclick="_prayerGo(${i})" aria-label="Page ${i+1}" style="flex:none;height:7px;width:${on?'20px':'7px'};border-radius:4px;border:none;padding:0;margin:0;cursor:pointer;background:rgba(255,255,255,${on?'.95':'.4'});transition:width .25s ease,background .25s ease"></button>`;}dots.innerHTML=dh;}
+  const fin=document.getElementById('pr-finish'); if(fin)fin.style.visibility=last?'visible':'hidden';
 }
+function _prayerGo(i){if(i>=0&&i<_prayerPages.length){_prayerStep=i;_renderPrayStep();}}
 function prayerNext(){if(_prayerStep<_prayerPages.length-1){_prayerStep++;_renderPrayStep();}}
 function prayerPrev(){if(_prayerStep>0){_prayerStep--;_renderPrayStep();}}
 let _prTouchX=0,_prTouchY=0;
