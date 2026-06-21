@@ -9259,23 +9259,16 @@ function rDiet(){
   if(!log.length){
     h+=`<div style="font-size:13px;color:var(--sub);padding:12px 0 4px;line-height:1.55">Nothing logged yet. Tap "+ Log food" to start — describe it in words with Analyze Meal, or pick from your library.</div>`;
   }else{
-    const cats=[['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snacks','Snacks'],['drinks','Drinks'],['custom','Other']];
-    cats.forEach(([key,label])=>{
-      const items=log.map((e,i)=>({e,i})).filter(o=>(o.e.cat||'custom')===key);
-      if(!items.length)return;
-      const kc=items.reduce((s,o)=>s+(+o.e.k||0),0);
-      // Category header (subtotal) — always followed by every item in it.
+    // Flat running list of every logged meal, newest first — no category buckets.
+    log.map((e,i)=>({e,i})).reverse().forEach(o=>{
+      const tm=_entryTime(o.e);
       h+=`<div class="mk-meal" style="cursor:default">
-        <div class="mk-meal-ic">${_mealIcon(key)}</div>
-        <div style="flex:1;min-width:0"><h4>${label}</h4></div>
-        <span class="mk-kc">${kc} cal</span></div>`;
-      items.forEach(o=>{
-        const tm=_entryTime(o.e);
-        h+=`<div class="mk-item"><div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600">${o.e.name}</div>
-          <div style="font-size:11px;color:var(--sub)">${o.e.p}p · ${o.e.c}c · ${o.e.f}f · ${o.e.k} cal${tm?' · '+tm:''}</div></div>
-          <button class="db" onclick="event.stopPropagation();delFood(${o.i})">✕</button></div>`;
-      });
+        <div class="mk-meal-ic">${_mealIcon(o.e.cat||'custom')}</div>
+        <div style="flex:1;min-width:0">
+          <h4>${o.e.name}</h4>
+          <div style="font-size:11px;color:var(--sub);margin-top:1px">${o.e.p}p · ${o.e.c}c · ${o.e.f}f · ${o.e.k} cal${tm?' · '+tm:''}</div>
+        </div>
+        <button class="db" onclick="delFood(${o.i})">✕</button></div>`;
     });
   }
   h+=`</div>`;
