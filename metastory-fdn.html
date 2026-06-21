@@ -2690,13 +2690,6 @@ function rToday(){
     });
     h+=`</div></div>`;
   }
-  // Pending meal check-in
-  const pend=_pendingMealCheckin();
-  if(pend){
-    h+=`<div class="fdn-chip" style="cursor:pointer" onclick="goPage('food')">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      <span><b>A meal check-in is waiting</b> — a few seconds on how ${pend} sat with you. That signal is how you learn your right plate.</span></div>`;
-  }
   // This week's focus
   let focus='';try{if(typeof computeProgress==='function'&&typeof pickWeeklyFocus==='function'){const fx=pickWeeklyFocus(computeProgress(PROG_REVIEW_DAYS));if(fx&&fx.label)focus=fx.label;}}catch(e){}
   if(focus){
