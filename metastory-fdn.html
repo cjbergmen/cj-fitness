@@ -947,7 +947,7 @@ function rSettingsModal(){
     <div class="card" style="margin-bottom:10px">
       <div class="ct">💊 My Supplements</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or any other source. Track daily intake on the Today tab.</div>
-      ${(()=>{const s=getSupps();return s.length?`<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">${s.length} supplement${s.length===1?'':'s'} configured</div>`:'';})()}
+      ${(()=>{const s=_suppPlan();return s.length?`<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">${s.length} supplement${s.length===1?'':'s'} configured</div>`:'';})()}
       <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()">💊 Manage Supplements</button>
     </div>
     <div class="card" style="margin-bottom:10px">
@@ -6609,15 +6609,16 @@ function openSuppModal(editId){
 }
 function closeSuppModal(){document.getElementById('supp-ov').classList.remove('open');_editSuppId=null;_suppScanPhoto=null;}
 function rSuppModal(){
-  const supps=getSupps();
+  const supps=_suppPlan();
   const editing=_editSuppId?supps.find(s=>s.id===_editSuppId):null;
   const body=document.getElementById('supp-modal-body');
   if(!body)return;
-  // Form section
-  const sel=(editing&&editing.timing)||[];
-  const timingChips=SUPP_TIMING_OPTS.map(t=>`<button type="button" id="stimc-${t}" onclick="toggleSuppTiming('${t}')"
-    style="padding:7px 14px;border-radius:20px;border:1.5px solid ${sel.includes(t)?'var(--blue)':'var(--border)'};background:${sel.includes(t)?'rgba(122,154,171,.2)':'transparent'};color:${sel.includes(t)?'var(--blue)':'var(--sub)'};font-size:12px;font-weight:600;cursor:pointer"
-    >${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('');
+  // Form section — single time-of-day slot to match the supplements page schedule
+  const curSlot=(editing&&editing.slot)||'';
+  const SUPP_SLOT_OPTS=[['morning','Morning'],['midday','Midday'],['evening','Evening']];
+  const timingChips=SUPP_SLOT_OPTS.map(([k,lbl])=>`<button type="button" id="sslot-${k}" onclick="pickSuppSlot('${k}')"
+    style="padding:7px 16px;border-radius:20px;border:1.5px solid ${curSlot===k?'var(--green)':'var(--border)'};background:${curSlot===k?'rgba(183,186,167,.25)':'transparent'};color:${curSlot===k?'var(--green)':'var(--sub)'};font-size:12px;font-weight:600;cursor:pointer"
+    >${lbl}</button>`).join('');
   const suppEmojis=['💊','🌿','🐟','🧴','🫙','⚗️','🫁','🧬','🩸','🌱'];
   const emojiPicker=suppEmojis.map(e=>`<span onclick="pickSuppEmoji('${e}')" style="font-size:22px;cursor:pointer;padding:4px;border-radius:6px;transition:background .1s" class="supp-emoji-opt">${e}</span>`).join('');
   body.innerHTML=`
@@ -6668,21 +6669,21 @@ function rSuppModal(){
       </div>`).join('')}
     </div>`:''}
   `;
-  // Restore timing selection state
-  _suppTimingSelected=editing?[...sel]:[];
+  // Restore selection state
+  _suppSlotSelected=editing?(editing.slot||''):'';
   _suppEmojiSelected=editing?editing.emoji||'💊':'💊';
 }
-let _suppTimingSelected=[];
+let _suppSlotSelected='';
 let _suppEmojiSelected='💊';
-function toggleSuppTiming(t){
-  const i=_suppTimingSelected.indexOf(t);
-  if(i>-1)_suppTimingSelected.splice(i,1);else _suppTimingSelected.push(t);
-  const btn=document.getElementById('stimc-'+t);
-  if(!btn)return;
-  const on=_suppTimingSelected.includes(t);
-  btn.style.borderColor=on?'var(--blue)':'var(--border)';
-  btn.style.background=on?'rgba(122,154,171,.2)':'transparent';
-  btn.style.color=on?'var(--blue)':'var(--sub)';
+function pickSuppSlot(slot){
+  _suppSlotSelected=slot;
+  ['morning','midday','evening'].forEach(k=>{
+    const btn=document.getElementById('sslot-'+k);if(!btn)return;
+    const on=k===slot;
+    btn.style.borderColor=on?'var(--green)':'var(--border)';
+    btn.style.background=on?'rgba(183,186,167,.25)':'transparent';
+    btn.style.color=on?'var(--green)':'var(--sub)';
+  });
 }
 function pickSuppEmoji(e){
   _suppEmojiSelected=e;
@@ -6694,25 +6695,26 @@ function saveSupplement(){
   if(!name){alert('Please enter a supplement name.');return;}
   const dose=(document.getElementById('supp-dose').value||'').trim();
   const notes=(document.getElementById('supp-notes').value||'').trim();
-  const supps=getSupps();
+  const slot=['morning','midday','evening'].includes(_suppSlotSelected)?_suppSlotSelected:'morning';
+  const supps=_suppPlan();
   if(_editSuppId){
     const idx=supps.findIndex(s=>s.id===_editSuppId);
-    if(idx>-1){supps[idx]={...supps[idx],name,dose,notes,timing:[..._suppTimingSelected],emoji:_suppEmojiSelected};}
+    if(idx>-1){supps[idx]={...supps[idx],name,dose,notes,slot,emoji:_suppEmojiSelected};}
   }else{
-    supps.push({id:'s'+Date.now(),name,dose,notes,timing:[..._suppTimingSelected],emoji:_suppEmojiSelected});
+    supps.push({id:'s'+Date.now(),name,dose,notes,slot,emoji:_suppEmojiSelected});
   }
-  setSupps(supps);
+  _suppSave(supps);
   _editSuppId=null;
   rSuppModal();
-  if(curPage==='today')rToday();
+  if(curPage==='supps')rSupps();else if(curPage==='today')rToday();
 }
 function delSupplement(id){
   if(!confirm('Remove this supplement?'))return;
-  const supps=getSupps().filter(s=>s.id!==id);
-  setSupps(supps);
+  const supps=_suppPlan().filter(s=>s.id!==id);
+  _suppSave(supps);
   _editSuppId=null;
   closeSuppModal();
-  if(curPage==='today')rToday();
+  if(curPage==='supps')rSupps();else if(curPage==='today')rToday();
 }
 
 function addSuppPhoto(input){
@@ -6806,16 +6808,10 @@ async function runSuppScan(){
       const ed=document.getElementById('supp-emoji-display');
       if(ed)ed.textContent=r.emoji;
     }
-    // Set timing chips
+    // Map the AI's timing to a single schedule slot (morning/midday/evening)
     if(Array.isArray(r.timing)&&r.timing.length){
-      _suppTimingSelected=r.timing.filter(t=>SUPP_TIMING_OPTS.includes(t));
-      _suppTimingSelected.forEach(t=>{
-        const btn=document.getElementById('stimc-'+t);
-        if(!btn)return;
-        btn.style.borderColor='var(--blue)';
-        btn.style.background='rgba(122,154,171,.2)';
-        btn.style.color='var(--blue)';
-      });
+      const map={morning:'morning',afternoon:'midday',evening:'evening',night:'evening'};
+      pickSuppSlot(map[r.timing[0]]||'morning');
     }
     if(status)status.innerHTML=`✅ Found: <strong>${r.name||'Supplement'}</strong>${r.benefits?' — '+r.benefits:''}`;
   }catch(err){
@@ -9181,7 +9177,7 @@ function rSupps(){
       </div></div>`;
   }
   // schedule
-  h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kicker">Today's schedule</span><button onclick="addSupp()" style="background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">+ Add</button></div>`;
+  h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kicker">Today's schedule</span><button onclick="openSuppModal()" style="background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">+ Add</button></div>`;
   if(!plan.length){
     h+=`<p style="font-size:13px;color:var(--sub);line-height:1.5;margin-top:10px">No supplements yet. Foundations first — food, sleep, and stress carry most of the load. Add one when you're ready, and we'll introduce it slowly.</p>`;
   }else{
@@ -9193,7 +9189,7 @@ function rSupps(){
         const on=taken.includes(s.id);const titring=t&&t.id===s.id;
         h+=`<div class="supp-row">
           <div class="chk-box ${on?'on':''}" onclick="toggleSupp('${s.id}')" style="cursor:pointer">${on?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-          <div style="flex:1"><div style="font-size:13.5px;font-weight:700">${s.name}</div><small style="font-size:11px;color:var(--sub)">${s.dose||''}${titring?' · titrating':''}</small></div>
+          <div style="flex:1;cursor:pointer" onclick="openSuppModal('${s.id}')"><div style="font-size:13.5px;font-weight:700">${s.emoji?s.emoji+' ':''}${s.name}</div><small style="font-size:11px;color:var(--sub)">${s.dose||''}${titring?' · titrating':''}</small></div>
           ${!titring&&!t?`<button onclick="startTitr('${s.id}')" style="background:none;border:none;color:var(--green);font-size:11px;font-weight:700;cursor:pointer">Titrate</button>`:''}
         </div>`;
       });
