@@ -9264,21 +9264,18 @@ function rDiet(){
       const items=log.map((e,i)=>({e,i})).filter(o=>(o.e.cat||'custom')===key);
       if(!items.length)return;
       const kc=items.reduce((s,o)=>s+(+o.e.k||0),0);
-      const names=items.map(o=>o.e.name).slice(0,3).join(', ')+(items.length>3?'…':'');
-      const open=_dietOpenCat===key;
-      h+=`<div class="mk-meal" onclick="_dietOpenCat='${open?'':key}';rDiet()">
+      // Category header (subtotal) — always followed by every item in it.
+      h+=`<div class="mk-meal" style="cursor:default">
         <div class="mk-meal-ic">${_mealIcon(key)}</div>
-        <div style="flex:1;min-width:0"><h4>${label}</h4><small>${names}</small></div>
+        <div style="flex:1;min-width:0"><h4>${label}</h4></div>
         <span class="mk-kc">${kc} cal</span></div>`;
-      if(open){
-        items.forEach(o=>{
-          const tm=_entryTime(o.e);
-          h+=`<div class="mk-item"><div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600">${o.e.name}</div>
-            <div style="font-size:11px;color:var(--sub)">${o.e.p}p · ${o.e.c}c · ${o.e.f}f · ${o.e.k} cal${tm?' · '+tm:''}</div></div>
-            <button class="db" onclick="event.stopPropagation();delFood(${o.i})">✕</button></div>`;
-        });
-      }
+      items.forEach(o=>{
+        const tm=_entryTime(o.e);
+        h+=`<div class="mk-item"><div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${o.e.name}</div>
+          <div style="font-size:11px;color:var(--sub)">${o.e.p}p · ${o.e.c}c · ${o.e.f}f · ${o.e.k} cal${tm?' · '+tm:''}</div></div>
+          <button class="db" onclick="event.stopPropagation();delFood(${o.i})">✕</button></div>`;
+      });
     });
   }
   h+=`</div>`;
