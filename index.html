@@ -214,6 +214,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .swap-item-tag{font-size:11px;color:var(--sub)}
 .swap-item-muscle{font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-bottom:4px;display:inline-block}
 .swap-ai-btn{margin:8px 16px 16px;background:var(--green);border:none;border-radius:var(--rs);color:#fff;font-size:13px;font-weight:600;padding:12px;cursor:pointer;text-align:center;flex-shrink:0;font-family:var(--font-sans)}
+.swap-footer{flex-shrink:0;padding:8px 16px 16px;display:flex;flex-direction:column;gap:8px;border-top:0.5px solid var(--border)}
+.swap-footer .swap-ai-btn{margin:0}
+.swap-input{-webkit-appearance:none;appearance:none;width:100%;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 13px;font-size:13.5px;color:var(--text);font-family:var(--font-sans)}
+.swap-input::placeholder{color:var(--sub)}
+.swap-input:focus{outline:none;border-color:var(--green)}
+.swap-manual-toggle{-webkit-appearance:none;appearance:none;background:transparent;border:none;color:var(--sub);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-sans);text-align:center;padding:2px}
+.swap-manual{display:flex;flex-direction:column;gap:8px;padding-top:2px}
 /* ── SAVE BAR ───────────────────────────────────────────────── */
 .swap-save-bar{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 14px;margin-top:14px;display:flex;align-items:center;gap:8px}
 .swap-save-label{font-size:12px;color:var(--sub);flex:1}
@@ -637,7 +644,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div class="swap-divider"></div>
   <div class="swap-tabs" id="swap-tabs"></div>
   <div class="swap-list" id="swap-list"></div>
-  <button class="swap-ai-btn" id="swap-ai-btn" onclick="askAIForSwaps()">Ask AI for more options</button>
+  <div class="swap-footer" id="swap-footer">
+    <input class="swap-input" id="swap-ai-input" placeholder="Describe what you want (optional)…">
+    <button class="swap-ai-btn" id="swap-ai-btn" onclick="askAIForSwaps()">✨ Ask AI for options</button>
+    <button class="swap-manual-toggle" id="swap-manual-toggle" onclick="toggleManualEntry()">+ Write in manually</button>
+    <div class="swap-manual" id="swap-manual" style="display:none">
+      <input class="swap-input" id="swap-m-name" placeholder="Exercise name">
+      <input class="swap-input" id="swap-m-tag" placeholder="Sets x reps (e.g. 3 x 10-12)">
+      <input class="swap-input" id="swap-m-rest" placeholder="Rest (e.g. 90 sec)">
+      <input class="swap-input" id="swap-m-cue" placeholder="Form cue (optional)">
+      <button class="swap-ai-btn" onclick="addManualExercise()">Add Exercise</button>
+    </div>
+  </div>
 </div>
 
 <!-- Sign-In Screen -->
@@ -2196,6 +2214,10 @@ function openSwapModal(idx, e){
   const group=EX_MUSCLE_MAP[name]||'chest';
   _swapMuscleFilter=group;
   document.getElementById('swap-title').textContent='Swap: '+name;
+  // reset AI input + manual-entry fields each time the modal opens
+  ['swap-ai-input','swap-m-name','swap-m-tag','swap-m-rest','swap-m-cue'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const _man=document.getElementById('swap-manual'); if(_man)_man.style.display='none';
+  const _mt=document.getElementById('swap-manual-toggle'); if(_mt)_mt.textContent='+ Write in manually';
   renderSwapTabs();
   renderSwapList();
   document.getElementById('swap-overlay').classList.add('open');
@@ -2324,7 +2346,9 @@ function askAIForSwaps(){
   const group=_swapMuscleFilter;
   const aiBtn=document.getElementById('swap-ai-btn');
   if(aiBtn){aiBtn.textContent='✨ Thinking…';aiBtn.disabled=true;}
-  const prompt=`I need 3 dumbbell-only alternative exercises for "${name}" (muscle group: ${group}). The user has 10-30 lb dumbbells only. Reply with ONLY a JSON array of 3 objects, each with keys: n (string name), tag (string like "3 x 10-12"), i (string 1-sentence cue), rest (string like "90 sec"), muscles (string like "Chest · triceps"). No markdown, no explanation.`;
+  const userReq=(document.getElementById('swap-ai-input')?.value||'').trim();
+  const reqLine=userReq?` IMPORTANT: the user specifically wants: "${userReq}". Honor this request when choosing the exercises.`:'';
+  const prompt=`I need 3 dumbbell-only alternative exercises for "${name}" (muscle group: ${group}). The user has 10-30 lb dumbbells only.${reqLine} Reply with ONLY a JSON array of 3 objects, each with keys: n (string name), tag (string like "3 x 10-12"), i (string 1-sentence cue), rest (string like "90 sec"), muscles (string like "Chest · triceps"). No markdown, no explanation.`;
   fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -2351,6 +2375,27 @@ function askAIForSwaps(){
     if(aiBtn){aiBtn.textContent='✨ Ask AI for more options';aiBtn.disabled=false;}
     showToast('AI error — please try again');
   });
+}
+function toggleManualEntry(){
+  const man=document.getElementById('swap-manual');
+  const mt=document.getElementById('swap-manual-toggle');
+  if(!man)return;
+  const isOpen=man.style.display!=='none';
+  man.style.display=isOpen?'none':'flex';
+  if(mt)mt.textContent=isOpen?'+ Write in manually':'– Hide manual entry';
+  if(!isOpen){const n=document.getElementById('swap-m-name');if(n)setTimeout(()=>n.focus(),50);}
+}
+function addManualExercise(){
+  const name=(document.getElementById('swap-m-name')?.value||'').trim();
+  if(!name){showToast('Enter an exercise name');return;}
+  const tag=(document.getElementById('swap-m-tag')?.value||'').trim()||'3 x 10-12';
+  const rest=(document.getElementById('swap-m-rest')?.value||'').trim()||'90 sec';
+  const cue=(document.getElementById('swap-m-cue')?.value||'').trim();
+  const labels={chest:'Chest',back:'Back',shoulders:'Shoulders',biceps:'Biceps',triceps:'Triceps',legs:'Legs',core:'Core'};
+  const newEx={n:name,tag:tag,i:cue,rest:rest,muscles:labels[_swapMuscleFilter]||_swapMuscleFilter};
+  const ci=_swapCandidates.length;
+  _swapCandidates[ci]=newEx;
+  applySwap(_swapModalIdx,ci);
 }
 function getWO(){
   const d=vdDate().getDay();
