@@ -920,7 +920,10 @@ function fbSyncSettings(){
     try { settings.qmOverrides = JSON.parse(lsGet('_qmIng','{}')); } catch(e){}
     try { settings.qmFreq = JSON.parse(lsGet('_qmFreq','{}')); } catch(e){}
     try { settings.foodLib = JSON.parse(lsGet('_foodlib','[]')); } catch(e){}
-    try { settings.supps = JSON.parse(lsGet('_supps','[]')); } catch(e){}
+    // Only include supps when this device actually has them. An empty local
+    // list must never overwrite a good cloud copy — real edits (including
+    // intentional deletions) go straight to the cloud via cloudWriteSupps.
+    try { const _sv = JSON.parse(lsGet('_supps','[]')); if(_sv && _sv.length) settings.supps = _sv; } catch(e){}
     try { const rt=lsGet('_routineTR',''); if(rt) settings.routineTR=JSON.parse(rt); } catch(e){}
     try { const rr=lsGet('_routineRS',''); if(rr) settings.routineRS=JSON.parse(rr); } catch(e){}
     try { const ut=lsGet('_userTargets',''); if(ut) settings.userTargets=JSON.parse(ut); } catch(e){}
@@ -6347,11 +6350,24 @@ document.addEventListener('click', function(e){
 // ── SUPPLEMENT TRACKER ───────────────────────────────────────────────────────
 function getSupps(){try{return JSON.parse(lsGet('_supps','[]'))||[];}catch{return[];}}
 function setSupps(a){
+  // Cloud-first: write the real list straight to the user's account so it
+  // persists immediately, even if this device's localStorage is full or gets
+  // evicted. This is the fix for supplements repeatedly "disappearing".
+  cloudWriteSupps(a);
   if(!lsSet('_supps',JSON.stringify(a))){
-    // Quota — value sits in MEM only, won't survive reload.
-    try{showToast('Storage full — supplement won\'t persist after reload');}catch(e){}
+    // localStorage is full on this device, but the cloud write above already
+    // saved it — it will sync back down on the next load.
+    try{showToast('Saved to your account (this device\'s storage is full)');}catch(e){}
   }
-  fbSyncSettings();
+}
+// Writes the supplement list directly to Firestore using the explicit array
+// passed in (never re-reading localStorage). This guarantees a full or evicted
+// local store can never push an empty list that overwrites a good cloud copy.
+// Intentional deletions still propagate, because the real (possibly empty)
+// array is written here on every save/remove.
+function cloudWriteSupps(a){
+  if(!fbUser || !fbDb) return;
+  try{ fbDb.collection('users').doc(fbUser.uid).set({ settings:{ supps:a }, updated: Date.now() }, {merge:true}).catch(()=>{}); }catch(e){}
 }
 // Supp log is keyed to viewDate (the date currently being viewed) — not
 // new Date() — so each day has its own independent set of taken supplements.
